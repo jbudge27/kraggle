@@ -8,7 +8,7 @@ Team_Stats object and functions.
 """
 
 import numpy as np
-import csv
+#import csv
 import statslib
 
 class TeamStat(object):
@@ -49,8 +49,8 @@ class TeamStat(object):
     | 20:32 Opp. stats (13 cols) | 33 Opp. TeamID
     
     Stat structure:
-    7 20| 8 21| 9 22 | 10 23|11 24|12 25|13 26|14 27|15 28|16 29|17 30|18 31|19 32
-    FGM | FGA | FGM3 | FGA3 | FTM | FTA | OR  | DR  | Ast | TO  | Stl | Blk | PF
+    7 20 | 8 21 | 9 22 | 10 23 | 11 24 | 12 25 | 13 26 | 14 27 | 15 28 | 16 29 | 17 30 | 18 31 | 19 32
+    FGM  | FGA  | FGM3 | FGA3  |  FTM  |  FTA  |  OR   |  DR   |  Ast  |  TO   | Stl   |  Blk  |  PF
     
     All values are floats.
     """
@@ -73,6 +73,7 @@ class TeamStat(object):
                     stats[5,i] = 1
                 else:
                     stats[5,i] = 2
+                stats[33,i] = float(games[i][4])
             else:
                 stats[3,i] = float(games[i][5])
                 stats[4,i] = float(games[i][3])
@@ -84,8 +85,8 @@ class TeamStat(object):
                     stats[5,i] = 2
                 else:
                     stats[5,i] = 1
+                stats[33,i] = float(games[i][2])
             stats[6,i] = float(games[i][7])
-            stats[33,i] = float(games[i][4])
             
         return stats.T
         
@@ -159,6 +160,10 @@ class TeamStat(object):
                 if g[1] == str(int(day)):
                     return idx
         return 0
+        
+    def gamesInSeason(self, year, tourney=False):
+        in_games = self.getGamesByYear(year, tourney)
+        return len(in_games)
 
 
     """
@@ -173,22 +178,23 @@ class TeamStat(object):
         for i in range(len(teamStats)):
             print '.',
             pace = 0.0
-            poss = 0.0
+            poss = 1.0
             prod_poss = 0.0
             unique_players = []
             game = self.getGameLog(teamStats[i])
             for g in game:
                 if g[-3] == str(self.team_id):
-                    if "timeout" not in g[-1]:
-                        pace += float(g[-4]) - 1200.0
+                    if "timeout" not in g[-1] or "sub" not in g[-1]:
+                        if float(g[-4]) < 2400.0: #exclude overtime stuff
+                            pace += float(g[-4]) - 1200.0
+                        unique_players.append(int(g[-2]))
                     if "made" in g[-1] or "reb" in g[-1] or g[-1] == "assist" or g[-1] == "block" or g[-1] == "steal":
                         prod_poss += 1
                         poss += 1
                     elif "miss" in g[-1] or "foul" in g[-1] or g[-1] == "turnover":
                         prod_poss -= 1
                         poss += 1
-                    if "sub" not in g[-1]:
-                        unique_players.append(int(g[-2]))
+                        
                     
             jeff_stats[i, 0] = pace / float(g[-4]) #fitness - change in pace over course of game
             jeff_stats[i, 1] = len(np.unique(np.array(unique_players))) #depth - how many players did something
@@ -212,6 +218,9 @@ class TeamStat(object):
                 rks.append([float(g[1]), av_rk / num_rks])
             else:
                 rks.append([float(g[1]), 0.0])
-        return np.array(rks)
+        rks = np.array(rks)
+        firstrank = rks[rks[:, 1] != 0.0, 1]
+        rks[rks[:, 1] == 0.0, 1] = firstrank[0]
+        return rks
                     
         
