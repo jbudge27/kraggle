@@ -9,6 +9,7 @@ Helper library for loading csv files and getting data.
 
 import glob
 import csv
+import numpy as np
 
 def loadDataDict(folder):
     fname = folder + "/*.csv"
@@ -143,4 +144,7 @@ def getTeamGames(team_id, data, tourney=False):
     gp = len(games) #for building arrays with the data
     
     return games, wins, gp
+
+            
+        
 

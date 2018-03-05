@@ -15,13 +15,21 @@ import numpy as np
 #from sklearn.preprocessing import StandardScaler
 folder = '../kraggle_data'
 data = statslib.loadDataDict(folder)
-t1 = 1140
-t2 = statslib.getIDFromTeam("Duke", data)
+#t1 = 1140
+#t2 = statslib.getIDFromTeam("Duke", data)
+test = ts.getMatchups(2017)
+probses = np.zeros((63,2))
+for n in range(63):
+    print str(n)
+    res, scores = ts.genProbabilities(test[n, 0], test[n, 1], 2017)
+    probses[n, :] = np.array([res[0] / sum(res), 1.0 - (res[0] / sum(res))])
+
+finalScore = ts.getLogScore(probses, test[:, 2])
 
 
-res, scores = ts.genProbabilities(t1, t2, 2017)
+#res, scores = ts.genProbabilities(t1, t2, 2017)
 
-print "I say " + statslib.getTeamFromID(t1, data) + " beats " + statslib.getTeamFromID(t2, data) + " about " + str((res[0] / sum(res))* 100.00) + "% of the time."
+#print "I say " + statslib.getTeamFromID(t1, data) + " beats " + statslib.getTeamFromID(t2, data) + " about " + str((res[0] / sum(res))* 100.00) + "% of the time."
 
 #
 #
