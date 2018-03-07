@@ -67,11 +67,25 @@ def getScaledStats(t1, year, verbose=False):
     home = TeamStat(folder, t1).getDerivedStatsByYear(year)
     
     #get defensive stats
-    homeStats, hg = getDefStats(t1, year, verbose)
+    #homeStats, hg = getDefStats(t1, year, verbose)
     
     return np.array([home[:,19], home[:, 18], scale(home[:, 12], 10, -10), 
-                scale(home[:, 13], 30, -30), home[:, 7], scale(homeStats[:, 0], .5, -.5), 
-                scale(homeStats[:, 3], 333, -333)])
+                scale(home[:, 13], 30, -30), home[:, 7]]) #, scale(homeStats[:, 0], .5, -.5), 
+                #scale(homeStats[:, 3], 333, -333)])
+                
+def simulateScore(stats, iters = 100):
+    results = np.zeros((iters,))
+    corrs = np.array([18.353, 88.881, 1.079, 20.621, -1.342])
+    avs = np.array([stats[:,19].mean(), stats[:, 18].mean(), scale(stats[:, 12].mean(), 10, -10), 
+                scale(stats[:, 13].mean(), 30, -30), stats[:, 7].mean()])
+    sigma = np.array([stats[:,19].std(), stats[:, 18].std(), scale(stats[:, 12], 10, -10).std(), 
+                scale(stats[:, 13], 30, -30).std(), stats[:, 7].std()])
+    for i in range(iters):
+        sts = np.zeros((5,))
+        for n in range(5):
+            sts[n] = np.random.normal(loc=avs[n], scale=sigma[n])
+        results[i] = sum(sts*corrs)
+    return results
     
 def genProbabilities(t1, t2, year, verbose=False):
     #grab data folder and csv filenames
@@ -81,38 +95,29 @@ def genProbabilities(t1, t2, year, verbose=False):
     away = TeamStat(folder, t2).getDerivedStatsByYear(year)
     
     #get defensive stats
-    homeStats, hg = getDefStats(t1, year, verbose)
-#    homeScore = np.array([homeStats[:, 0].mean(), homeStats[:, 1].std(),
-#    (np.average(homeStats[:, 2], weights=np.exp(np.arange(hg))) / 182.5) - 1,
-#    np.gradient(homeStats[:, 2]).std() / 50.0,
-#    homeStats[:, 3].mean() / 100.0])
-    #mn = homeScore.mean()
-    #mstd = homeScore.std()
-    #homeScore = (homeScore - mn) / mstd
-    homeRank = np.average(homeStats[:, 2], weights=np.exp(np.arange(hg)))
-    corrs = np.array([-.613, .506, .674, .677, -.531, -.507, -.496, .5])
-    homeScore = np.array([home[:,19].mean(), home[:, 18].mean(), scale(home[:, 12].mean(), 10, -10), 
-                scale(home[:, 13].mean(), 30, -30), home[:, 7].mean(), scale(homeStats[:, 0].mean(), .5, -.5), 
-                scale(homeStats[:, 3].mean(), 333, -333), scale(homeRank, 1, 364)])
-    
-    awayStats, ag = getDefStats(t2, year, verbose)
-    
-#    awayScore = np.array([awayStats[:, 0].mean(), awayStats[:, 1].std(),
-#    (np.average(awayStats[:, 2], weights=np.exp(np.arange(ag))) / 182.5) - 1,
-#    np.gradient(awayStats[:, 2]).std() / 50.0,
-#    awayStats[:, 3].mean() / 100.0])
-    #awayScore = (awayScore - mn) / mstd
-    awayRank = np.average(awayStats[:, 2], weights=np.exp(np.arange(ag)))
-    awayScore = np.array([away[:,19].mean(), away[:, 18].mean(), scale(away[:, 12].mean(), 10, -10), 
-                scale(away[:, 13].mean(), 30, -30), away[:, 7].mean(), scale(awayStats[:, 0].mean(), -.5, .5),
-                scale(awayStats[:, 3].mean(), 333, -333), scale(awayRank, 1, 364)])
+    #homeStats, hg = getDefStats(t1, year, verbose)
 
-    hFinal = sum(homeScore*corrs)
-    aFinal = sum(awayScore*corrs)
-#    hFinal = (-homeScore[0] + homeScore[2])*(homeScore[1] + homeScore[3]) / homeScore[4]
-#    aFinal = (-awayScore[0] + awayScore[2])*(awayScore[1] + awayScore[3]) / awayScore[4]
+#    #homeRank = np.average(homeStats[:, 2], weights=np.exp(np.arange(hg)))
+#    corrs = np.array([18.353, 88.881, 1.079, 20.621, -1.342])
+#    homeScore = np.array([home[:,19].mean(), home[:, 18].mean(), scale(home[:, 12].mean(), 10, -10), 
+#                scale(home[:, 13].mean(), 30, -30), home[:, 7].mean()]) #, scale(homeStats[:, 0].mean(), .5, -.5), 
+#                #scale(homeStats[:, 3].mean(), 333, -333)])
+#    
+#    #awayStats, ag = getDefStats(t2, year, verbose)
+#    
+#    #awayRank = np.average(awayStats[:, 2], weights=np.exp(np.arange(ag)))
+#    awayScore = np.array([away[:,19].mean(), away[:, 18].mean(), scale(away[:, 12].mean(), 10, -10), 
+#                scale(away[:, 13].mean(), 30, -30), away[:, 7].mean()]) #, scale(awayStats[:, 0].mean(), -.5, .5),
+#                #scale(awayStats[:, 3].mean(), 333, -333)])
+#
+#    hFinal = sum(homeScore*corrs)
+#    aFinal = sum(awayScore*corrs)
+    homeScore = simulateScore(home)
+    awayScore = simulateScore(away)
     
-    hperc = hFinal / (hFinal + aFinal)
+    hperc = sum(homeScore - awayScore > 0) / 100.0
+    hFinal = 0
+    aFinal = 0
     
     return [hperc, 1.0 - hperc], [hFinal, aFinal], [homeScore, awayScore]
     

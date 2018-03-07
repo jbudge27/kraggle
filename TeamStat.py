@@ -100,21 +100,23 @@ class TeamStat(object):
     0 Team FG% | 1 Team 3FG% | 2 Team FT% | 3 Team RB% | 4 Team Ast% | 5 Opp FG% | 6 Opp 3FG%
     | 7 Opp FT% | 8 Opp RB% | 9 Opp Ast% | 10 Pt Diff | 11 OR Diff | 12 DR Diff 
     | 13 Ast Diff | 14 TO Diff | 15 Stl Diff | 16 Blk Diff | 17 PF Diff
-    | 18 Team TS% | 19 Opp TS% | Team FTR | Opp FTR
+    | 18 Team TS% | 19 Opp TS% | 20 Team FTR | 21 Opp FTR
     """
     def getDerivedStats(self, tourney=False):
         gp = self.tourney_games_played if tourney else self.season_games_played
         s = self.stats
         stats = np.zeros((gp, 22))
         for i in range(gp):
+            tft = 1 if s[i, 12] == 0 else s[i, 12]
+            oft = 1 if s[i, 25] == 0 else s[i, 25]
             stats[i, 0] = s[i, 7] / s[i, 8]
             stats[i, 1] = s[i, 9] / s[i, 10]
-            stats[i, 2] = s[i, 11] / s[i, 12]
+            stats[i, 2] = s[i, 11] / tft
             stats[i, 3] = (s[i, 13] + s[i, 14]) / (sum(s[i, 13:14] + s[i, 26:27]))
             stats[i, 4] = s[i, 15] / s[i, 7]
             stats[i, 5] = s[i, 20] / s[i, 21]
             stats[i, 6] = s[i, 22] / s[i, 23]
-            stats[i, 7] = s[i, 24] / s[i, 25]
+            stats[i, 7] = s[i, 24] / oft
             stats[i, 8] = 1.0 - stats[i, 3]
             stats[i, 9] = s[i, 28] / s[i, 20]
             stats[i, 10] = s[i, 3] - s[i, 4]
