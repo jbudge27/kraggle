@@ -8,6 +8,9 @@ Matchup generator, using stats from the season to predict winner of a game.
 """
 
 from TeamStat import TeamStat
+from joblib import Parallel, delayed
+import time
+import multiprocessing
 import numpy as np
 import scipy as sp
 import statslib as slib
@@ -57,35 +60,40 @@ Stats structure:
 
 Also returns the number of games in the set as 'hg'.
 """
+
+def defstatsloop(g):
+    retlist = []
+    oppteam_id = g[0]
+    oppteam = TeamStat('../kraggle_data', int(oppteam_id))
+    oppteamStats = oppteam.getDerivedStatsByYear(g[6])
+    oppteamRank = oppteam.getAverageRank(g[6])
+    oppRank = oppteamRank[oppteam.getGameNumber(g[6], g[1]),1]
+    opp_avfgp = oppteamStats[:,18].mean()
+    retlist.append(g[3] - opp_avfgp)
+    retlist.append(g[4])
+    retlist.append(g[2])
+    retlist.append(g[5] - oppRank)
+    return retlist
+    
 def getDefStats(t1, year, verbose=False):
     folder = '../kraggle_data'
     home = TeamStat(folder, t1)
     
     if verbose:
-        print "Getting defensive stats",
+        print "Getting defensive stats...",
         
     hg = home.gamesInSeason(year)
     homeRaw = home.getStatsByYear(year)
     homeDer = home.getDerivedStatsByYear(year)
     homeRank = home.getAverageRank(year)
-    stats = np.zeros((hg, 4))
-    stats[:, 2] = homeRank[:, 1]
-    
+    passlist = []
+    pt = time.time()
     for g in range(hg):
-        if verbose:
-            print '.',
-        oppteam_id = homeRaw[g, 33]
-        oppteam = TeamStat(folder, int(oppteam_id))
-        oppteamStats = oppteam.getDerivedStatsByYear(year)
-        oppteamRank = oppteam.getAverageRank(year)
-        oppRank = oppteamRank[oppteam.getGameNumber(year, homeRaw[g, 2]),1]
-        opp_avfgp = oppteamStats[:,18].mean()
-        stats[g, 0] = homeDer[g,19] - opp_avfgp
-        stats[g, 1] = homeDer[g,18]
-        stats[g, 3] = homeRank[g, 1] - oppRank
-        
+        passlist.append([homeRaw[g, 33], homeRaw[g, 2], homeRank[g, 1], homeDer[g, 19], homeDer[g, 18], homeRank[g, 1], year])
+    stats = Parallel(n_jobs=multiprocessing.cpu_count())(delayed(defstatsloop)(g) for g in passlist)
     if verbose:
-        print "Done."
+        print "{:.3f} secs for loop.".format(time.time() - pt)
+    stats = np.array(stats)
     return stats, hg
     
 """
@@ -104,16 +112,18 @@ def getScaledStats(t1, year, verbose=False):
                 scale(home[:, 13], 30, -30), home[:, 7], scale(homeStats[:, 0], .5, -.5), 
                 scale(homeStats[:, 3], 333, -333)])
                 
-def simulateScore(hStats, aStats, pt_diff, iters = 100, verbose = False):
+def simulateScore(hStats, aStats, pt_diff, rkg, iters = 100, verbose = False):
     results = np.zeros((iters,))
     corrs = getTeamType(hStats, pt_diff, verbose)
     gameStats = hStats
-    gameStats[0, :] = aStats[0, :]
     gameStats[1, :] = hStats[1, :] + unscale(aStats[5, :].mean(), .5, -.5)
-    gameStats[4, :] = aStats[4, :]
     avs = np.mean(hStats, axis=1)
+    avs[0] = aStats[0, :].mean()
+    avs[4] = aStats[4, :].mean()
     sigma = np.std(hStats, axis=1)
-    avs[6] = aStats[6, -1]
+    sigma[0] = aStats[0, :].std()
+    sigma[4] = aStats[4, :].std()
+    avs[6] = scale(rkg, 333, -333)
     sigma[6] = 0
     for i in range(iters):
         sts = np.zeros((len(corrs),))
@@ -125,16 +135,19 @@ def simulateScore(hStats, aStats, pt_diff, iters = 100, verbose = False):
 def genProbabilities(t1, t2, year, verbose=False):
     #grab data folder and csv filenames
     folder = '../kraggle_data'
-    home = TeamStat(folder, t1).getDerivedStatsByYear(year)
-    away = TeamStat(folder, t2).getDerivedStatsByYear(year)
+    iters = 1000
+    home = TeamStat(folder, t1)
+    away = TeamStat(folder, t2)
     hStats = getScaledStats(t1, year, verbose)
     aStats = getScaledStats(t2, year, verbose)
+    rkg = np.average(home.getAverageRank(year)[:, 1], weights=np.exp(np.arange(shape(hStats)[1]))) \
+        - np.average(away.getAverageRank(year)[:, 1], weights=np.exp(np.arange(shape(aStats)[1])))
     if verbose:
-        print "Simulating games..."
-    homeScore = simulateScore(hStats, aStats, home[:,10], 100, verbose)
-    awayScore = simulateScore(aStats, hStats, away[:,10], 100, verbose)
+        print "Simulating {} games...".format(iters)
+    homeScore = simulateScore(hStats, aStats, home.getDerivedStatsByYear(year)[:,10], rkg, iters, verbose)
+    awayScore = simulateScore(aStats, hStats, away.getDerivedStatsByYear(year)[:,10], -rkg, iters, verbose)
     
-    hperc = sum(homeScore - awayScore > 0) / 100.0
+    hperc = sum(homeScore - awayScore > 0) / (iters + 0.0)
     
     return [hperc, 1.0 - hperc], [hStats, aStats], [homeScore, awayScore]
     

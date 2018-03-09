@@ -17,16 +17,16 @@ import numpy as np
 folder = '../kraggle_data'
 data = statslib.loadDataDict(folder)
 #teams = np.arange(1140, 1400)
-teams = [statslib.getIDFromTeam("North Carolina", data), statslib.getIDFromTeam("Gonzaga", data), statslib.getIDFromTeam("Villanova", data), statslib.getIDFromTeam("Wisconsin", data)]
-#test = ts.getMatchups(2017)
-#probses = np.zeros((63,2))
-#for n in range(63):
-#    print str(n)
-#    perc, res, scores = ts.genProbabilities(test[n, 0], test[n, 1], 2017)
-#    probses[n, :] = np.array(perc)
-#
-#finalScore = ts.getLogScore(probses, test[:, 2])
-perc, res, scores = ts.genProbabilities(teams[2], teams[3], 2017, True)
+#teams = [statslib.getIDFromTeam("North Carolina", data), statslib.getIDFromTeam("Gonzaga", data), statslib.getIDFromTeam("Villanova", data), statslib.getIDFromTeam("Wisconsin", data)]
+test = ts.getMatchups(2017)
+probses = np.zeros((63,2))
+for n in range(63):
+    print str(n)
+    perc, res, scores = ts.genProbabilities(test[n, 0], test[n, 1], 2017)
+    probses[n, :] = np.array(perc)
+
+finalScore = ts.getLogScore(probses, test[:, 2])
+#perc, res, scores = ts.genProbabilities(statslib.getIDFromTeam("Oklahoma", data), statslib.getIDFromTeam("BYU", data), 2017, True)
 #team = TeamStat(folder, 1140)
 #test = ts.getScaledStats(1140, 2017, True)
 #lssol = np.linalg.lstsq(test.T, team.getStatsByYear(2017)[:, 3].T)
