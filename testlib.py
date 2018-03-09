@@ -11,6 +11,7 @@ from TeamStat import TeamStat
 import numpy as np
 import scipy as sp
 import statslib as slib
+from pylab import shape
 import csv
 
 
@@ -19,6 +20,36 @@ def scale(x, mx, mn):
     a = 0.0
     b = 1.0
     return (b - a)*(x - mn) / (mx - mn) + a
+    
+def unscale(x, a, b):
+    mx = 1.0
+    mn = 0.0
+    return (x-a)*(mx - mn) / (b - a) + mn    
+
+
+def getTeamType(stats, pt_diff, verbose):
+    team_types = np.array([[ 0.18947928,  0.69989005,  0.27564864,  0.22650642,  0.10083039,  0.18585862,  -0.15739254],
+                           [ 0.09000703,  0.76764929,  0.42093012,  0.44655541,  0.10403649,  0.14024649,  -0.40459465],
+                           [-0.17506678,  0.78111676,  0.54828041,  0.51704579, -0.07191937, -0.1188948,  -0.39758784]])
+    tt = np.corrcoef(stats, np.reshape(pt_diff, (1, shape(stats)[1])))[shape(stats)[0], 0:-1]
+    dists = np.zeros((shape(team_types)[0],))
+    for i in range(len(dists)):
+        dists[i] = np.linalg.norm(team_types[i] - tt)
+    if dists.min() == dists[0]:
+        if verbose:
+            print "Shooting Team"
+        return [51.106, 90.868, -1.703, 13.345, 1.464, -27.938, -6.804]
+    elif dists.min() == dists[1]:
+        if verbose:
+            print "Balanced Team"
+        return [52.244, 86.026, .822, 21.130, .161, -23.314, -14.710]
+    elif dists.min() == dists[2]:
+        if verbose:
+            print "Defensive Team"
+        return [44.059, 83.952, 3.521, 23.963, -1.635, -20.134, -10.562]
+    else:
+        print "THIS IS WEIRD..."
+    
     
 """
 Stats structure:
@@ -67,22 +98,26 @@ def getScaledStats(t1, year, verbose=False):
     home = TeamStat(folder, t1).getDerivedStatsByYear(year)
     
     #get defensive stats
-    #homeStats, hg = getDefStats(t1, year, verbose)
+    homeStats, hg = getDefStats(t1, year, verbose)
     
     return np.array([home[:,19], home[:, 18], scale(home[:, 12], 10, -10), 
-                scale(home[:, 13], 30, -30), home[:, 7]]) #, scale(homeStats[:, 0], .5, -.5), 
-                #scale(homeStats[:, 3], 333, -333)])
+                scale(home[:, 13], 30, -30), home[:, 7], scale(homeStats[:, 0], .5, -.5), 
+                scale(homeStats[:, 3], 333, -333)])
                 
-def simulateScore(stats, iters = 100):
+def simulateScore(hStats, aStats, pt_diff, iters = 100, verbose = False):
     results = np.zeros((iters,))
-    corrs = np.array([18.353, 88.881, 1.079, 20.621, -1.342])
-    avs = np.array([stats[:,19].mean(), stats[:, 18].mean(), scale(stats[:, 12].mean(), 10, -10), 
-                scale(stats[:, 13].mean(), 30, -30), stats[:, 7].mean()])
-    sigma = np.array([stats[:,19].std(), stats[:, 18].std(), scale(stats[:, 12], 10, -10).std(), 
-                scale(stats[:, 13], 30, -30).std(), stats[:, 7].std()])
+    corrs = getTeamType(hStats, pt_diff, verbose)
+    gameStats = hStats
+    gameStats[0, :] = aStats[0, :]
+    gameStats[1, :] = hStats[1, :] + unscale(aStats[5, :].mean(), .5, -.5)
+    gameStats[4, :] = aStats[4, :]
+    avs = np.mean(hStats, axis=1)
+    sigma = np.std(hStats, axis=1)
+    avs[6] = aStats[6, -1]
+    sigma[6] = 0
     for i in range(iters):
-        sts = np.zeros((5,))
-        for n in range(5):
+        sts = np.zeros((len(corrs),))
+        for n in range(len(corrs)):
             sts[n] = np.random.normal(loc=avs[n], scale=sigma[n])
         results[i] = sum(sts*corrs)
     return results
@@ -90,36 +125,18 @@ def simulateScore(stats, iters = 100):
 def genProbabilities(t1, t2, year, verbose=False):
     #grab data folder and csv filenames
     folder = '../kraggle_data'
-    #data = slib.loadDataDict(folder)
     home = TeamStat(folder, t1).getDerivedStatsByYear(year)
     away = TeamStat(folder, t2).getDerivedStatsByYear(year)
-    
-    #get defensive stats
-    #homeStats, hg = getDefStats(t1, year, verbose)
-
-#    #homeRank = np.average(homeStats[:, 2], weights=np.exp(np.arange(hg)))
-#    corrs = np.array([18.353, 88.881, 1.079, 20.621, -1.342])
-#    homeScore = np.array([home[:,19].mean(), home[:, 18].mean(), scale(home[:, 12].mean(), 10, -10), 
-#                scale(home[:, 13].mean(), 30, -30), home[:, 7].mean()]) #, scale(homeStats[:, 0].mean(), .5, -.5), 
-#                #scale(homeStats[:, 3].mean(), 333, -333)])
-#    
-#    #awayStats, ag = getDefStats(t2, year, verbose)
-#    
-#    #awayRank = np.average(awayStats[:, 2], weights=np.exp(np.arange(ag)))
-#    awayScore = np.array([away[:,19].mean(), away[:, 18].mean(), scale(away[:, 12].mean(), 10, -10), 
-#                scale(away[:, 13].mean(), 30, -30), away[:, 7].mean()]) #, scale(awayStats[:, 0].mean(), -.5, .5),
-#                #scale(awayStats[:, 3].mean(), 333, -333)])
-#
-#    hFinal = sum(homeScore*corrs)
-#    aFinal = sum(awayScore*corrs)
-    homeScore = simulateScore(home)
-    awayScore = simulateScore(away)
+    hStats = getScaledStats(t1, year, verbose)
+    aStats = getScaledStats(t2, year, verbose)
+    if verbose:
+        print "Simulating games..."
+    homeScore = simulateScore(hStats, aStats, home[:,10], 100, verbose)
+    awayScore = simulateScore(aStats, hStats, away[:,10], 100, verbose)
     
     hperc = sum(homeScore - awayScore > 0) / 100.0
-    hFinal = 0
-    aFinal = 0
     
-    return [hperc, 1.0 - hperc], [hFinal, aFinal], [homeScore, awayScore]
+    return [hperc, 1.0 - hperc], [hStats, aStats], [homeScore, awayScore]
     
 """
 Matchups array key as follows:
