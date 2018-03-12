@@ -106,11 +106,20 @@ def getScaledStats(t1, year, verbose=False):
     home = TeamStat(folder, t1).getDerivedStatsByYear(year)
     
     #get defensive stats
+    if verbose:
+        print "Grabbing stats for team {} of {}".format(t1, year)
     homeStats, hg = getDefStats(t1, year, verbose)
     
     return np.array([home[:,19], home[:, 18], scale(home[:, 12], 10, -10), 
                 scale(home[:, 13], 30, -30), home[:, 7], scale(homeStats[:, 0], .5, -.5), 
                 scale(homeStats[:, 3], 333, -333)])
+    
+def getCorrelation(t1, year, stats, verbose=False):
+    pt_diff = TeamStat('../kraggle_data', t1).getDerivedStatsByYear(year)[:, 10]
+    if verbose:
+        print "Grabbing scaled stats for {}".format(t1)
+    #stats = getScaledStats(t1, year, verbose)
+    return np.corrcoef(stats, np.reshape(pt_diff, (1, shape(stats)[1])))[shape(stats)[0], 0:-1]
                 
 def simulateScore(hStats, aStats, pt_diff, rkg, iters = 100, verbose = False):
     results = np.zeros((iters,))
