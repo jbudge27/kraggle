@@ -16,6 +16,7 @@ import scipy as sp
 import statslib as slib
 from pylab import shape
 import csv
+import pickle
 
 
 
@@ -28,31 +29,34 @@ def unscale(x, a, b):
     mx = 1.0
     mn = 0.0
     return (x-a)*(mx - mn) / (b - a) + mn    
-
+    
+def getCorrelation(t1, year, stats, tourney, verbose=False):
+    pt_diff = TeamStat('../kraggle_data', t1).getDerivedStatsByYear(year, tourney)[:, 10]
+    if verbose:
+        print "Grabbing scaled stats for {}".format(t1)
+    #stats = getScaledStats(t1, year, verbose)
+    return np.corrcoef(stats, np.reshape(pt_diff, (1, shape(stats)[1])))[shape(stats)[0], 0:-1]
 
 def getTeamType(stats, pt_diff, verbose):
-    team_types = np.array([[ 0.18947928,  0.69989005,  0.27564864,  0.22650642,  0.10083039,  0.18585862,  -0.15739254],
-                           [ 0.09000703,  0.76764929,  0.42093012,  0.44655541,  0.10403649,  0.14024649,  -0.40459465],
-                           [-0.17506678,  0.78111676,  0.54828041,  0.51704579, -0.07191937, -0.1188948,  -0.39758784]])
+    ttypes = pickle.load(open('./ttypes.pkl'))
     tt = np.corrcoef(stats, np.reshape(pt_diff, (1, shape(stats)[1])))[shape(stats)[0], 0:-1]
-    dists = np.zeros((shape(team_types)[0],))
-    for i in range(len(dists)):
-        dists[i] = np.linalg.norm(team_types[i] - tt)
-    if dists.min() == dists[0]:
-        if verbose:
-            print "Shooting Team"
-        return [51.106, 90.868, -1.703, 13.345, 1.464, -27.938, -6.804]
-    elif dists.min() == dists[1]:
-        if verbose:
-            print "Balanced Team"
-        return [52.244, 86.026, .822, 21.130, .161, -23.314, -14.710]
-    elif dists.min() == dists[2]:
-        if verbose:
-            print "Defensive Team"
-        return [44.059, 83.952, 3.521, 23.963, -1.635, -20.134, -10.562]
-    else:
-        print "THIS IS WEIRD..."
-    
+    team_type = np.zeros((len(tt),))
+    devs = ttypes['mean'] - tt
+    stds = ttypes['stds']
+    for i in range(len(devs)):
+        if devs[i] > stds[i]:
+            team_type += ttypes[str(i+1)]
+            if verbose:
+                print str(i+1)
+        elif devs[i] < -stds[i]:
+            team_type += ttypes[str(-(i+1))]
+            if verbose:
+                print str(-(i+1))
+        else:
+            team_type += ttypes['base']
+    if verbose:
+        print team_type / len(devs)
+    return team_type / len(devs)
     
 """
 Stats structure:
@@ -65,9 +69,9 @@ def defstatsloop(g):
     retlist = []
     oppteam_id = g[0]
     oppteam = TeamStat('../kraggle_data', int(oppteam_id))
-    oppteamStats = oppteam.getDerivedStatsByYear(g[6])
+    oppteamStats = oppteam.getDerivedStatsByYear(g[6], g[7])
     oppteamRank = oppteam.getAverageRank(g[6])
-    oppRank = oppteamRank[oppteam.getGameNumber(g[6], g[1]),1]
+    oppRank = oppteamRank[oppteam.getGameNumber(g[6], g[1], g[7]),1]
     opp_avfgp = oppteamStats[:,18].mean()
     retlist.append(g[3] - opp_avfgp)
     retlist.append(g[4])
@@ -75,21 +79,21 @@ def defstatsloop(g):
     retlist.append(g[5] - oppRank)
     return retlist
     
-def getDefStats(t1, year, verbose=False):
+def getDefStats(t1, year, tourney=False, verbose=False):
     folder = '../kraggle_data'
     home = TeamStat(folder, t1)
     
     if verbose:
         print "Getting defensive stats...",
         
-    hg = home.gamesInSeason(year)
-    homeRaw = home.getStatsByYear(year)
-    homeDer = home.getDerivedStatsByYear(year)
+    hg = home.gamesInSeason(year, tourney)
+    homeRaw = home.getStatsByYear(year, tourney)
+    homeDer = home.getDerivedStatsByYear(year, tourney)
     homeRank = home.getAverageRank(year)
     passlist = []
     pt = time.time()
     for g in range(hg):
-        passlist.append([homeRaw[g, 33], homeRaw[g, 2], homeRank[g, 1], homeDer[g, 19], homeDer[g, 18], homeRank[g, 1], year])
+        passlist.append([homeRaw[g, 33], homeRaw[g, 2], homeRank[g, 1], homeDer[g, 19], homeDer[g, 18], homeRank[g, 1], year, tourney])
     stats = Parallel(n_jobs=multiprocessing.cpu_count())(delayed(defstatsloop)(g) for g in passlist)
     if verbose:
         print "{:.3f} secs for loop.".format(time.time() - pt)
@@ -101,26 +105,20 @@ Your scaled stats glossary:
 | 0 Opp TS% | 1 Team TS% | 2 DR Diff. | 3 Ast Diff. | 4 Opp FT% | 5 TS% Impact
 | 6 Rank Diff. |
 """ 
-def getScaledStats(t1, year, verbose=False):
+def getScaledStats(t1, year, tourney=False, verbose=False):
     folder = '../kraggle_data'
-    home = TeamStat(folder, t1).getDerivedStatsByYear(year)
+    home = TeamStat(folder, t1).getDerivedStatsByYear(year, tourney)
     
     #get defensive stats
     if verbose:
         print "Grabbing stats for team {} of {}".format(t1, year)
-    homeStats, hg = getDefStats(t1, year, verbose)
+    homeStats, hg = getDefStats(t1, year, tourney, verbose)
     
     return np.array([home[:,19], home[:, 18], scale(home[:, 12], 10, -10), 
                 scale(home[:, 13], 30, -30), home[:, 7], scale(homeStats[:, 0], .5, -.5), 
                 scale(homeStats[:, 3], 333, -333)])
     
-def getCorrelation(t1, year, stats, verbose=False):
-    pt_diff = TeamStat('../kraggle_data', t1).getDerivedStatsByYear(year)[:, 10]
-    if verbose:
-        print "Grabbing scaled stats for {}".format(t1)
-    #stats = getScaledStats(t1, year, verbose)
-    return np.corrcoef(stats, np.reshape(pt_diff, (1, shape(stats)[1])))[shape(stats)[0], 0:-1]
-                
+               
 def simulateScore(hStats, aStats, pt_diff, rkg, iters = 100, verbose = False):
     results = np.zeros((iters,))
     corrs = getTeamType(hStats, pt_diff, verbose)
@@ -141,20 +139,23 @@ def simulateScore(hStats, aStats, pt_diff, rkg, iters = 100, verbose = False):
         results[i] = sum(sts*corrs)
     return results
     
-def genProbabilities(t1, t2, year, verbose=False):
+def genProbabilities(t1, t2, year, tourney=False, verbose=False):
     #grab data folder and csv filenames
     folder = '../kraggle_data'
-    iters = 1000
+    iters = 100
     home = TeamStat(folder, t1)
     away = TeamStat(folder, t2)
-    hStats = getScaledStats(t1, year, verbose)
-    aStats = getScaledStats(t2, year, verbose)
+    hStats = getScaledStats(t1, year, tourney, verbose)
+    aStats = getScaledStats(t2, year, tourney, verbose)
     rkg = np.average(home.getAverageRank(year)[:, 1], weights=np.exp(np.arange(shape(hStats)[1]))) \
         - np.average(away.getAverageRank(year)[:, 1], weights=np.exp(np.arange(shape(aStats)[1])))
     if verbose:
         print "Simulating {} games...".format(iters)
-    homeScore = simulateScore(hStats, aStats, home.getDerivedStatsByYear(year)[:,10], rkg, iters, verbose)
-    awayScore = simulateScore(aStats, hStats, away.getDerivedStatsByYear(year)[:,10], -rkg, iters, verbose)
+        print "Team {}".format(t1)
+    homeScore = simulateScore(hStats, aStats, home.getDerivedStatsByYear(year, tourney)[:,10], rkg, iters, verbose)
+    if verbose:
+        print "Team {}".format(t2)
+    awayScore = simulateScore(aStats, hStats, away.getDerivedStatsByYear(year, tourney)[:,10], -rkg, iters, verbose)
     
     hperc = sum(homeScore - awayScore > 0) / (iters + 0.0)
     

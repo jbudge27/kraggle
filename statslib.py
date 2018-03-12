@@ -10,6 +10,7 @@ Helper library for loading csv files and getting data.
 import glob
 import csv
 import numpy as np
+#import pickle
 
 def loadDataDict(folder):
     fname = folder + "/*.csv"
