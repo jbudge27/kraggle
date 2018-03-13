@@ -38,7 +38,7 @@ def getCorrelation(t1, year, stats, tourney, verbose=False):
     return np.corrcoef(stats, np.reshape(pt_diff, (1, shape(stats)[1])))[shape(stats)[0], 0:-1]
 
 def getTeamType(stats, pt_diff, verbose):
-    ttypes = pickle.load(open('./ttypes.pkl'))
+    ttypes = pickle.load(open('./ttypes_t.pkl'))
     tt = np.corrcoef(stats, np.reshape(pt_diff, (1, shape(stats)[1])))[shape(stats)[0], 0:-1]
     team_type = np.zeros((len(tt),))
     devs = ttypes['mean'] - tt
@@ -147,8 +147,10 @@ def genProbabilities(t1, t2, year, tourney=False, verbose=False):
     away = TeamStat(folder, t2)
     hStats = getScaledStats(t1, year, tourney, verbose)
     aStats = getScaledStats(t2, year, tourney, verbose)
-    rkg = np.average(home.getAverageRank(year)[:, 1], weights=np.exp(np.arange(shape(hStats)[1]))) \
-        - np.average(away.getAverageRank(year)[:, 1], weights=np.exp(np.arange(shape(aStats)[1])))
+    hRank = home.getAverageRank(year)[:, 1]
+    aRank = away.getAverageRank(year)[:, 1]
+    rkg = np.average(hRank, weights=np.exp(np.arange(shape(hRank)[0]))) \
+        - np.average(aRank, weights=np.exp(np.arange(shape(aRank)[0])))
     if verbose:
         print "Simulating {} games...".format(iters)
         print "Team {}".format(t1)

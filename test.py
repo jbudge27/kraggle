@@ -49,7 +49,7 @@ def load_pickles(folder, tourney):
     if tourney:
         ct = np.array(pickle.load(open(folder + "/sccorrs_t.pkl")))
         sts = np.concatenate(pickle.load(open(folder + "/scsts_t.pkl")), axis=1)
-        spts = np.concatenate(pickle.load(open(folder + "/scpts_t.pkl"))[0:-1])
+        spts = np.concatenate(pickle.load(open(folder + "/scpts_t.pkl")))
         stslist = pickle.load(open(folder + "/scsts_t.pkl"))
         sptslist = pickle.load(open(folder + "/scpts_t.pkl"))
     else:
@@ -60,46 +60,56 @@ def load_pickles(folder, tourney):
         sptslist = pickle.load(open(folder + "/scpts.pkl"))
     return ct, sts, spts, stslist, sptslist
 
-def build_ttypes(pickle_folder, tourney):
+def build_ttypes(pickle_folder, tourney=False):
     ct, sts, spts, stslist, sptslist = load_pickles(pickle_folder, tourney)
+    valids = (np.sum(np.isnan(ct) + (np.abs(ct) == 1), axis=1) != 0)
     lssz = len(stslist)
     numstats = shape(sts)[0]
-    ctave = np.mean(ct, axis=0)
+    ctave = np.mean(ct[valids, :], axis=0)
     lssol = np.linalg.lstsq(sts.T, spts)
-    sols = np.zeros((2*numstats+1, numstats))
-    solkey = []
-    sols[0, :] = lssol[0]
-    solkey.append(0)
+    #sols = np.zeros((2*numstats+1, numstats))
+    #solkey = []
+    #sols[0, :] = lssol[0]
+    #solkey.append(0)
     ttypes = {}
     ttypes['base'] = lssol[0]
     ttypes['mean'] = ctave
-    ttypes['stds'] = np.std(ct, axis=0)
+    ttypes['stds'] = np.std(ct[valids, :], axis=0)
     for n in range(1, numstats+1):
         deviates = []
         dev_pts = []
         undeviates = []
         undev_pts = []
-        dists = np.zeros((lssz, 7))
+        #dists = np.zeros((lssz, 7))
         for i in range(lssz):
-            dists[i, :] = ct[i, :] - ctave
-            if dists[i, n-1] > ttypes['stds'][n-1]:
-                deviates.append(stslist[i])
-                dev_pts.append(sptslist[i])
-            if dists[i, n-1] < -ttypes['stds'][n-1]:
-                undeviates.append(stslist[i])
-                undev_pts.append(sptslist[i])
-        deviates = np.concatenate(deviates, axis=1)
-        dev_pts = np.concatenate(dev_pts)
-        undeviates = np.concatenate(undeviates, axis=1)
-        undev_pts = np.concatenate(undev_pts)
-        lssol = np.linalg.lstsq(deviates.T, dev_pts)
-        sols[2*n-1, :] = lssol[0]
-        solkey.append(n)
-        ttypes[str(n)] = lssol[0]
-        lssol = np.linalg.lstsq(undeviates.T, undev_pts)
-        sols[2*n, :] = lssol[0]
-        solkey.append(-n)
-        ttypes[str(-(n))] = lssol[0]
+            if valids[i]:
+                dist = ct[i, n] - ctave[n]
+                if dist > ttypes['stds'][n-1]:
+                    deviates.append(stslist[i])
+                    dev_pts.append(sptslist[i])
+                if dist < -ttypes['stds'][n-1]:
+                    undeviates.append(stslist[i])
+                    undev_pts.append(sptslist[i])
+        if len(deviates) > 0:
+            deviates = np.concatenate(deviates, axis=1)
+            dev_pts = np.concatenate(dev_pts)
+            lssol = np.linalg.lstsq(deviates.T, dev_pts)
+            #sols[2*n-1, :] = lssol[0]
+            #solkey.append(n)
+            ttypes[str(n)] = lssol[0]
+        else:
+            ttypes[str(n)] = ttypes['base']
+            print 'Not enough information for {}'.format(n)
+        if len(undeviates) > 0:
+            undeviates = np.concatenate(undeviates, axis=1)
+            undev_pts = np.concatenate(undev_pts)
+            lssol = np.linalg.lstsq(undeviates.T, undev_pts)
+            #sols[2*n, :] = lssol[0]
+            #solkey.append(-n)
+            ttypes[str(-(n))] = lssol[0]
+        else:
+            ttypes[str(-(n))] = ttypes['base']
+            print 'Not enough information for {}'.format(-n)
     if tourney:
         pickle.dump(ttypes, open(pickle_folder + "/ttypes_t.pkl", "w"))
         test = pickle.load(open(pickle_folder + "/ttypes_t.pkl"))
@@ -123,8 +133,8 @@ teams = np.arange(1101, 1464)
 #
 #finalScore = ts.getLogScore(probses, test[:, 2])
 #test = ts.getCorrelation(statslib.getIDFromTeam("Virginia", data), 2017, True)
-#build_ttypes(folder)
+build_ttypes(pickle_folder, True)
 #build_pickles(folder, pickle_folder, True)
-#ct, sts, spts, stslist, sptslist = load_pickles(pickle_folder, False)
-perc, res, scores = ts.genProbabilities(statslib.getIDFromTeam("Villanova", data), statslib.getIDFromTeam("North Carolina", data), 2016, False, True)
+#ct, sts, spts, stslist, sptslist = load_pickles(pickle_folder, True)
+#perc, res, scores = ts.genProbabilities(statslib.getIDFromTeam("Gonzaga", data), statslib.getIDFromTeam("North Carolina", data), 2017, False, True)
 
