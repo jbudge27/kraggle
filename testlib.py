@@ -38,7 +38,7 @@ def getCorrelation(t1, year, stats, tourney, verbose=False):
     return np.corrcoef(stats, np.reshape(pt_diff, (1, shape(stats)[1])))[shape(stats)[0], 0:-1]
 
 def getTeamType(stats, pt_diff, verbose):
-    ttypes = pickle.load(open('./ttypes_t.pkl'))
+    ttypes = pickle.load(open('./ttypes.pkl'))
     tt = np.corrcoef(stats, np.reshape(pt_diff, (1, shape(stats)[1])))[shape(stats)[0], 0:-1]
     team_type = np.zeros((len(tt),))
     devs = ttypes['mean'] - tt
@@ -53,7 +53,7 @@ def getTeamType(stats, pt_diff, verbose):
             if verbose:
                 print str(-(i+1))
         else:
-            team_type += ttypes['base']
+            team_type += np.array([72.83999, 16.19815, 7.00, 37.317, 10.782, -11.429, -13.5571]) #ttypes['base']
     if verbose:
         print team_type / len(devs)
     return team_type / len(devs)
@@ -142,7 +142,7 @@ def simulateScore(hStats, aStats, pt_diff, rkg, iters = 100, verbose = False):
 def genProbabilities(t1, t2, year, tourney=False, verbose=False):
     #grab data folder and csv filenames
     folder = '../kraggle_data'
-    iters = 100
+    iters = 1000
     home = TeamStat(folder, t1)
     away = TeamStat(folder, t2)
     hStats = getScaledStats(t1, year, tourney, verbose)

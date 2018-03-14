@@ -128,13 +128,13 @@ teams = np.arange(1101, 1464)
 #probses = np.zeros((63,2))
 #for n in range(63):
 #    print str(n)
-#    perc, res, scores = ts.genProbabilities(test[n, 0], test[n, 1], 2017)
+#    perc, res, scores = ts.genProbabilities(test[n, 0], test[n, 1], 2017, True)
 #    probses[n, :] = np.array(perc)
 #
 #finalScore = ts.getLogScore(probses, test[:, 2])
 #test = ts.getCorrelation(statslib.getIDFromTeam("Virginia", data), 2017, True)
-build_ttypes(pickle_folder, True)
+#build_ttypes(pickle_folder, True)
 #build_pickles(folder, pickle_folder, True)
 #ct, sts, spts, stslist, sptslist = load_pickles(pickle_folder, True)
-#perc, res, scores = ts.genProbabilities(statslib.getIDFromTeam("Gonzaga", data), statslib.getIDFromTeam("North Carolina", data), 2017, False, True)
+perc, res, scores = ts.genProbabilities(statslib.getIDFromTeam("North Carolina", data), statslib.getIDFromTeam("Kentucky", data), 2017, False, True)
 
