@@ -7,6 +7,8 @@ Created on Fri Feb 23 16:57:31 2018
 
 from TeamStat import TeamStat
 from sklearn import cluster
+from sklearn.neural_network import MLPClassifier
+from sklearn.preprocessing import StandardScaler
 import statslib
 from pylab import shape
 import testlib as ts
@@ -18,11 +20,12 @@ from matplotlib import pyplot as plt
 #from sklearn.neural_network import MLPClassifier
 #from sklearn.preprocessing import StandardScaler
 
-def build_pickles(folder, pickle_folder, tourney):
+def build_pickles(folder, pickle_folder, tourney=False):
     #ranges = np.zeros((11,2))
     scsts = []
     scpts = []
     sccorrs = []
+    teams = np.arange(1101, 1464)
     for year in range(2003, 2018):
         print str(year),
         for i in teams:
@@ -44,6 +47,22 @@ def build_pickles(folder, pickle_folder, tourney):
         pickle.dump(scpts, open(pickle_folder + "/scpts.pkl", "w"))
         pickle.dump(sccorrs, open(pickle_folder + "/sccorrs.pkl", "w"))
     return 1
+    
+def build_fast_stats(folder, tourney=False):
+    scsts = []
+    sclabels = []
+    teams = np.arange(1101, 1464)
+    for year in range(2003, 2018):
+        print str(year),
+        for i in teams:
+            print '.',
+            curr_team = TeamStat(folder, i)
+            tmp = curr_team.getStatsByYear(year, tourney)[:, 3]
+            if len(tmp) > 0:
+                scsts.append(curr_team.getDerivedStatsByYear(year, tourney))
+                sclabels.append(ts.grabLabels(i, year))
+                #sccorrs.append(overcorr)
+    return scsts, sclabels
 
 def load_pickles(folder, tourney):
     if tourney:
@@ -123,6 +142,7 @@ folder = '../kraggle_data'
 pickle_folder = '.'
 data = statslib.loadDataDict(folder)
 teams = np.arange(1101, 1464)
+#test = ts.getCorrelation(1140, 2017, ts.getScaledStats(1140, 2017), False, True)
 #teams = [statslib.getIDFromTeam("North Carolina", data), statslib.getIDFromTeam("Gonzaga", data), statslib.getIDFromTeam("Villanova", data), statslib.getIDFromTeam("Wisconsin", data)]
 #test = ts.getMatchups(2017)
 #probses = np.zeros((63,2))
@@ -132,9 +152,17 @@ teams = np.arange(1101, 1464)
 #    probses[n, :] = np.array(perc)
 #
 #finalScore = ts.getLogScore(probses, test[:, 2])
-#test = ts.getCorrelation(statslib.getIDFromTeam("Virginia", data), 2017, True)
+#test = ts.getCorrelation(teams[0], 2017, ts.getScaledStats(teams[0], 2017), False, True)
+#test = ts.getScaledStats(teams[0], 2017)
 #build_ttypes(pickle_folder, True)
-#build_pickles(folder, pickle_folder, True)
+#build_pickles(folder, pickle_folder, False)
 #ct, sts, spts, stslist, sptslist = load_pickles(pickle_folder, True)
-perc, res, scores = ts.genProbabilities(statslib.getIDFromTeam("North Carolina", data), statslib.getIDFromTeam("Kentucky", data), 2017, False, True)
+#perc, res, scores = ts.genProbabilities(statslib.getIDFromTeam("North Carolina", data), statslib.getIDFromTeam("Kentucky", data), 2017, False, True)
+scsts, sclabels = build_fast_stats(folder)
+training_data = np.array(scsts)
+labels = np.array(sclabels)
+model = MLPClassifier(solver='adam', hidden_layer_sizes=(30, 15, 3))
+scaler = StandardScaler()
+scaler.fit(training_data)
+model.fit(scaler.transform(training_data), labels)
 

@@ -10,6 +10,8 @@ Team_Stats object and functions.
 import numpy as np
 #import csv
 import statslib
+from joblib import Parallel, delayed
+import multiprocessing
 
 class TeamStat(object):
     
@@ -145,6 +147,7 @@ class TeamStat(object):
         day = game[1]
         season = game[0]
         events = statslib.loadPlayData(self.file_loc + "/play_by_play", season)
+        #game_log = Parallel(n_jobs=multiprocessing.cpu_count())(delayed(gamelogloop)(g, day, win_id, lose_id) for g in events)
         for g in events:
             if g[2] == day:
                 if g[3] == win_id:
@@ -178,6 +181,8 @@ class TeamStat(object):
     I want to see if these are predictive of anything.
     """
     
+
+        
     def getJeffStats(self, year, tourney=False):
         teamStats = self.getGamesByYear(year, tourney)
         jeff_stats = np.zeros((len(teamStats),3))
@@ -189,23 +194,29 @@ class TeamStat(object):
             prod_poss = 0.0
             unique_players = []
             game = self.getGameLog(teamStats[i])
-            for g in game:
-                if g[-3] == str(self.team_id):
-                    if "timeout" not in g[-1] or "sub" not in g[-1]:
-                        if float(g[-4]) < 2400.0: #exclude overtime stuff
-                            pace += float(g[-4]) - 1200.0
-                        unique_players.append(int(g[-2]))
-                    if "made" in g[-1] or "reb" in g[-1] or g[-1] == "assist" or g[-1] == "block" or g[-1] == "steal":
-                        prod_poss += 1
-                        poss += 1
-                    elif "miss" in g[-1] or "foul" in g[-1] or g[-1] == "turnover":
-                        prod_poss -= 1
-                        poss += 1
+            if len(game) > 0:
+                stats = np.array(Parallel(n_jobs=multiprocessing.cpu_count())(delayed(jeffstatsloop)(g, self.team_id) for g in game))
+                pace = sum(stats[:, 0])
+                unique_players = stats[:, 1]
+                prod_poss = sum(stats[:, 2])
+                poss = 1.0 + sum(stats[:, 3])
+    #            for g in game:
+    #                if g[-3] == str(self.team_id):
+    #                    if "timeout" not in g[-1] or "sub" not in g[-1]:
+    #                        if float(g[-4]) < 2400.0: #exclude overtime stuff
+    #                            pace += float(g[-4]) - 1200.0
+    #                        unique_players.append(int(g[-2]))
+    #                    if "made" in g[-1] or "reb" in g[-1] or g[-1] == "assist" or g[-1] == "block" or g[-1] == "steal":
+    #                        prod_poss += 1
+    #                        poss += 1
+    #                    elif "miss" in g[-1] or "foul" in g[-1] or g[-1] == "turnover":
+    #                        prod_poss -= 1
+    #                        poss += 1
+                            
                         
-                    
-            jeff_stats[i, 0] = pace / float(g[-4]) #fitness - change in pace over course of game
-            jeff_stats[i, 1] = len(np.unique(np.array(unique_players))) #depth - how many players did something
-            jeff_stats[i, 2] = prod_poss / poss #productive possession percentage - number of possessions used productively
+                jeff_stats[i, 0] = pace / 28788 #fitness - change in pace over course of game
+                jeff_stats[i, 1] = len(np.unique(np.array(unique_players))) - 1 #depth - how many players did something
+                jeff_stats[i, 2] = prod_poss / poss #productive possession percentage - number of possessions used productively
         return jeff_stats
         
     def getAverageRank(self, year):
@@ -230,4 +241,26 @@ class TeamStat(object):
         rks[rks[:, 1] == 0.0, 1] = firstrank[0]
         return rks
                     
-        
+def jeffstatsloop(g, team_id):
+    pace = 0.0
+    unique_players = 0.0
+    prod_poss = 0.0
+    poss = 0.0
+    if g[-3] == str(team_id):
+        if "timeout" not in g[-1] or "sub" not in g[-1]:
+            if float(g[-4]) < 2400.0: #exclude overtime stuff
+                pace = float(g[-4]) - 1200.0
+            unique_players = int(g[-2])
+        if "made" in g[-1] or "reb" in g[-1] or g[-1] == "assist" or g[-1] == "block" or g[-1] == "steal":
+            prod_poss = 1
+            poss = 1
+        elif "miss" in g[-1] or "foul" in g[-1] or g[-1] == "turnover":
+            prod_poss = -1
+            poss = 1
+    return np.array([pace, unique_players, prod_poss, poss])
+    
+def gamelogloop(g, day, win_id, lose_id):
+    if g[2] == day:
+        if g[3] == win_id:
+            if g[4] == lose_id:
+                return g

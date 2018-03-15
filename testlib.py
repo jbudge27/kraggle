@@ -30,7 +30,7 @@ def unscale(x, a, b):
     mn = 0.0
     return (x-a)*(mx - mn) / (b - a) + mn    
     
-def getCorrelation(t1, year, stats, tourney, verbose=False):
+def getCorrelation(t1, year, stats, tourney=False, verbose=False):
     pt_diff = TeamStat('../kraggle_data', t1).getDerivedStatsByYear(year, tourney)[:, 10]
     if verbose:
         print "Grabbing scaled stats for {}".format(t1)
@@ -107,8 +107,9 @@ Your scaled stats glossary:
 """ 
 def getScaledStats(t1, year, tourney=False, verbose=False):
     folder = '../kraggle_data'
-    home = TeamStat(folder, t1).getDerivedStatsByYear(year, tourney)
-    
+    homeT = TeamStat(folder, t1)
+    home = homeT.getDerivedStatsByYear(year, tourney)
+    jeffStats = homeT.getJeffStats(year, tourney)
     #get defensive stats
     if verbose:
         print "Grabbing stats for team {} of {}".format(t1, year)
@@ -116,7 +117,7 @@ def getScaledStats(t1, year, tourney=False, verbose=False):
     
     return np.array([home[:,19], home[:, 18], scale(home[:, 12], 10, -10), 
                 scale(home[:, 13], 30, -30), home[:, 7], scale(homeStats[:, 0], .5, -.5), 
-                scale(homeStats[:, 3], 333, -333)])
+                scale(homeStats[:, 3], 333, -333), scale(jeffStats[:, 0], 2, 0), jeffStats[:, 2]])
     
                
 def simulateScore(hStats, aStats, pt_diff, rkg, iters = 100, verbose = False):
@@ -226,6 +227,10 @@ def getMatchups(year):
                 if sg[n, 33] == float(games[i, 1]):
                     games[i, 2] = sg[n, 3] > sg[n, 4]
     return games
+    
+def grabLabels(t1, year, tourney=False):
+    home = TeamStat('../kraggle_data', t1)
+    return home.getDerivedStatsByYear(year, tourney)[:, 10] > 0
         
                 
     
