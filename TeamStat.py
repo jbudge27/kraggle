@@ -114,7 +114,7 @@ class TeamStat(object):
             stats[i, 0] = s[i, 7] / s[i, 8]
             stats[i, 1] = s[i, 9] / s[i, 10]
             stats[i, 2] = s[i, 11] / tft
-            stats[i, 3] = (s[i, 13] + s[i, 14]) / (sum(s[i, 13:14] + s[i, 26:27]))
+            stats[i, 3] = (s[i, 13] + s[i, 14]) / (sum(s[i, 13:15] + s[i, 26:28]))
             stats[i, 4] = s[i, 15] / s[i, 7]
             stats[i, 5] = s[i, 20] / s[i, 21]
             stats[i, 6] = s[i, 22] / s[i, 23]

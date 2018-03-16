@@ -9,6 +9,7 @@ from TeamStat import TeamStat
 from sklearn import cluster
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
+from Network import Network
 import statslib
 from pylab import shape
 import testlib as ts
@@ -57,10 +58,11 @@ def build_fast_stats(folder, tourney=False):
         for i in teams:
             print '.',
             curr_team = TeamStat(folder, i)
-            tmp = curr_team.getStatsByYear(year, tourney)[:, 3]
-            if len(tmp) > 0:
-                scsts.append(curr_team.getDerivedStatsByYear(year, tourney))
-                sclabels.append(ts.grabLabels(i, year))
+            dstats = curr_team.getDerivedStatsByYear(year, tourney)
+            stats = curr_team.getStatsByYear(year, tourney)
+            if len(stats) > 0:
+                scsts.append(np.concatenate((dstats[:, 0:10], dstats[:, 18:22], stats[:, 7:33]), axis=1))
+                sclabels.append(ts.grabLabels(i, year, tourney))
                 #sccorrs.append(overcorr)
     return scsts, sclabels
 
@@ -148,8 +150,8 @@ teams = np.arange(1101, 1464)
 #probses = np.zeros((63,2))
 #for n in range(63):
 #    print str(n)
-#    perc, res, scores = ts.genProbabilities(test[n, 0], test[n, 1], 2017, True)
-#    probses[n, :] = np.array(perc)
+#    perc, res = ts.genNetworkProbabilities(test[n, 0], test[n, 1], 2017, '../kraggle_model.pkl', False, True)
+#    probses[n, :] = np.array([perc, 1.0-perc])
 #
 #finalScore = ts.getLogScore(probses, test[:, 2])
 #test = ts.getCorrelation(teams[0], 2017, ts.getScaledStats(teams[0], 2017), False, True)
@@ -158,11 +160,21 @@ teams = np.arange(1101, 1464)
 #build_pickles(folder, pickle_folder, False)
 #ct, sts, spts, stslist, sptslist = load_pickles(pickle_folder, True)
 #perc, res, scores = ts.genProbabilities(statslib.getIDFromTeam("North Carolina", data), statslib.getIDFromTeam("Kentucky", data), 2017, False, True)
-scsts, sclabels = build_fast_stats(folder)
-training_data = np.array(scsts)
-labels = np.array(sclabels)
-model = MLPClassifier(solver='adam', hidden_layer_sizes=(30, 15, 3))
-scaler = StandardScaler()
-scaler.fit(training_data)
-model.fit(scaler.transform(training_data), labels)
+scsts, sclabels = build_fast_stats(folder, True)
+sz = len(scsts)
+sz_cut = int(sz * 7.0/8)
+training_data = scsts[0]
+labels = sclabels[0]
+for i in range(1, sz):
+    training_data = np.concatenate((training_data, scsts[i]), axis=0)
+    labels = np.concatenate((labels, sclabels[i]))
+sz = len(labels)
+sz_cut = int(sz * 7.0/8)
+model = Network([64, 32, 16, 8, 4])
+model.train(training_data[0:sz_cut, :], labels[0:sz_cut])
+test, percs = model.run(training_data[sz_cut:, :], True)
+truths = labels[sz_cut:]
+#model.save('/home/artemis-new/Documents/kraggle_model.pkl')
+#test = ts.simNetworkScore(teams[0], teams[1], 2017, '../kraggle_model.pkl')
+#prob = (sum(test == 2) + sum(test == 3) + 0.0) / len(test)
 

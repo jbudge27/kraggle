@@ -8,6 +8,7 @@ Matchup generator, using stats from the season to predict winner of a game.
 """
 
 from TeamStat import TeamStat
+from Network import Network
 from joblib import Parallel, delayed
 import time
 import multiprocessing
@@ -118,6 +119,41 @@ def getScaledStats(t1, year, tourney=False, verbose=False):
     return np.array([home[:,19], home[:, 18], scale(home[:, 12], 10, -10), 
                 scale(home[:, 13], 30, -30), home[:, 7], scale(homeStats[:, 0], .5, -.5), 
                 scale(homeStats[:, 3], 333, -333), scale(jeffStats[:, 0], 2, 0), jeffStats[:, 2]])
+                
+def getTestStats(t1, year, tourney=False, verbose=False):
+    home = TeamStat('../kraggle_data', t1)
+    dstats = home.getDerivedStatsByYear(year, tourney)
+    stats = home.getStatsByYear(year, tourney)
+    if len(stats) > 0:
+        return np.concatenate((dstats[:, 0:10], dstats[:, 18:22], stats[:, 7:33]), axis=1)
+    else:
+        return 0
+        
+def simNetworkScore(t1, t2, year, model, tourney, verbose=False):
+    results = np.zeros((1000,))
+    home = np.mean(getTestStats(t1, year, tourney, verbose), axis=0)
+    away = np.mean(getTestStats(t2, year, tourney, verbose), axis=0)
+    hstd = np.std(getTestStats(t1, year, tourney, verbose), axis=0)
+    astd = np.std(getTestStats(t2, year, tourney, verbose), axis=0)
+    avs = np.concatenate((home[0:5], away[5:10], home[10:12], away[12:14], home[14:28], away[28:]))
+    stds = np.concatenate((hstd[0:5], astd[5:10], hstd[10:12], astd[12:14], hstd[14:28], astd[28:]))
+    nn = Network([10])
+    nn.load(model)
+    for i in range(1000):
+        sts = np.zeros((len(avs),))
+        for n in range(len(sts)):
+            sts[n] = np.random.normal(loc=avs[n], scale=stds[n])
+        results[i] = nn.run(sts)
+    return results
+    
+def genNetworkProbabilities(t1, t2, year, model, tourney=False, verbose=False):
+    res = simNetworkScore(t1, t2, year, model, tourney, verbose)
+    prob = (sum(res == 2) + sum(res == 3)*2.0 - sum(res == 0)) / len(res)
+    if prob <= 0:
+        prob = .01
+    elif prob >= 1:
+        prob = .99
+    return prob, res
     
                
 def simulateScore(hStats, aStats, pt_diff, rkg, iters = 100, verbose = False):
@@ -229,8 +265,13 @@ def getMatchups(year):
     return games
     
 def grabLabels(t1, year, tourney=False):
-    home = TeamStat('../kraggle_data', t1)
-    return home.getDerivedStatsByYear(year, tourney)[:, 10] > 0
+    home = TeamStat('../kraggle_data', t1).getDerivedStatsByYear(year, tourney)[:, 10]
+    ret = home + 0.0
+    ret[home < 0] = 1
+    ret[home > 0] = 2
+    ret[home < -15] = 0
+    ret[home > 15] = 3
+    return ret
         
                 
     
