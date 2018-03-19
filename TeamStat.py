@@ -99,15 +99,15 @@ class TeamStat(object):
     """
     This function derives some more high-level stuff for messing around with.
     Returns a matrix with the following fields:
-    0 Team FG% | 1 Team 3FG% | 2 Team FT% | 3 Team RB% | 4 Team Ast% | 5 Opp FG% | 6 Opp 3FG%
+    | 0 Team FG% | 1 Team 3FG% | 2 Team FT% | 3 Team RB% | 4 Team Ast% | 5 Opp FG% | 6 Opp 3FG%
     | 7 Opp FT% | 8 Opp RB% | 9 Opp Ast% | 10 Pt Diff | 11 OR Diff | 12 DR Diff 
     | 13 Ast Diff | 14 TO Diff | 15 Stl Diff | 16 Blk Diff | 17 PF Diff
-    | 18 Team TS% | 19 Opp TS% | 20 Team FTR | 21 Opp FTR
+    | 18 Team TS% | 19 Opp TS% | 20 Team FTR | 21 Opp FTR | 22 Team Poss | 23 Opp Poss
     """
     def getDerivedStats(self, tourney=False):
         gp = self.tourney_games_played if tourney else self.season_games_played
         s = self.stats
-        stats = np.zeros((gp, 22))
+        stats = np.zeros((gp, 24))
         for i in range(gp):
             tft = 1 if s[i, 12] == 0 else s[i, 12]
             oft = 1 if s[i, 25] == 0 else s[i, 25]
@@ -127,6 +127,8 @@ class TeamStat(object):
             stats[i, 19] = s[i, 4] / (2.0*s[i, 21] + .44*s[i, 25])
             stats[i, 20] = s[i, 12] / s[i, 8]
             stats[i, 21] = s[i, 25] / s[i, 21]
+            stats[i, 22] = s[i, 8] - s[i, 13] + s[i, 16] + .44*s[i, 12]
+            stats[i, 23] = s[i, 21] - s[i, 26] + s[i, 29] + .44*s[i, 25]
         return stats
         
     def getDerivedStatsByYear(self, year, tourney=False):
@@ -237,8 +239,9 @@ class TeamStat(object):
             else:
                 rks.append([float(g[1]), 0.0])
         rks = np.array(rks)
-        firstrank = rks[rks[:, 1] != 0.0, 1]
-        rks[rks[:, 1] == 0.0, 1] = firstrank[0]
+        if len(rks) > 0:
+            firstrank = rks[rks[:, 1] != 0.0, 1]
+            rks[rks[:, 1] == 0.0, 1] = firstrank[0]
         return rks
                     
 def jeffstatsloop(g, team_id):

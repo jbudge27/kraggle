@@ -120,16 +120,30 @@ def getScaledStats(t1, year, tourney=False, verbose=False):
                 scale(home[:, 13], 30, -30), home[:, 7], scale(homeStats[:, 0], .5, -.5), 
                 scale(homeStats[:, 3], 333, -333), scale(jeffStats[:, 0], 2, 0), jeffStats[:, 2]])
                 
+"""
+And the test_stats glossary...
+|0 Team FG% | 1 Team 3FG% | 2 Team FT% | 3 Team RB% | 4 Team Ast% | 5 Opp FG% | 6 Opp 3FG%
+| 7 Opp FT% | 8 Opp RB% | 9 Opp Ast% | 10 Team TS% | 11 Opp TS% | 12 Team FTR | 13 Opp FTR 
+| 14 Team Poss | 15 Opp Poss | 16:28 Team stats (13 cols) | 29:41 Opp. stats (13 cols) | 42 Team Rank
+
+Stat structure:
+16 29 | 17 30 | 18 31 | 19 32 | 20 33 | 21 34 | 22 35 | 23 36 | 24 37 | 25 38 | 26 39 | 27 40 | 28 41
+FGM   | FGA   | FGM3  | FGA3  |  FTM  |  FTA  |  OR   |  DR   |  Ast  |  TO   | Stl   |  Blk  |  PF
+"""
 def getTestStats(t1, year, tourney=False, verbose=False):
     home = TeamStat('../kraggle_data', t1)
     dstats = home.getDerivedStatsByYear(year, tourney)
     stats = home.getStatsByYear(year, tourney)
+    ranks = home.getAverageRank(year)
+    if tourney:
+        final_rank = np.average(ranks, weights=np.exp(np.arange(len(ranks))))
+        ranks = np.ones((shape(stats)[0]))*final_rank
     if len(stats) > 0:
-        return np.concatenate((dstats[:, 0:10], dstats[:, 18:22], stats[:, 7:33]), axis=1)
+        return np.concatenate((dstats[:, 0:10], dstats[:, 18:24], stats[:, 7:33], ranks), axis=1)
     else:
         return 0
         
-def simNetworkScore(t1, t2, year, model, tourney, verbose=False):
+def simNetworkScore(t1, t2, year, model, tourney=False, verbose=False):
     results = np.zeros((1000,))
     home = np.mean(getTestStats(t1, year, tourney, verbose), axis=0)
     away = np.mean(getTestStats(t2, year, tourney, verbose), axis=0)
@@ -273,9 +287,6 @@ def grabLabels(t1, year, tourney=False):
     ret[home > 15] = 3
     return ret
         
-                
-    
-    
 def getLogScore(predictions, labels):
     n = len(labels)
     return -1/n*sum(labels*np.log10(predictions[:,0]) + (1.0 - labels)*np.log10(predictions[:,1]))
