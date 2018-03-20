@@ -172,38 +172,43 @@ pickle_folder = '.'
 data = statslib.loadDataDict(folder)
 #teams = np.arange(1101, 1464)
 ##test = ts.getCorrelation(1140, 2017, ts.getScaledStats(1140, 2017), False, True)
-##teams = [statslib.getIDFromTeam("North Carolina", data), statslib.getIDFromTeam("Gonzaga", data), statslib.getIDFromTeam("Villanova", data), statslib.getIDFromTeam("Wisconsin", data)]
-#test = ts.getMatchups(2017)
-#probses = np.zeros((63,2))
-#for n in range(63):
-#    print str(n)
-#    perc, res = ts.genNetworkProbabilities(test[n, 0], test[n, 1], 2017, '../kraggle_model.pkl', False, True)
-#    probses[n, :] = np.array([perc, 1.0-perc])
-#
-#finalScore = ts.getLogScore(probses, test[:, 2])
+#teams = [statslib.getIDFromTeam("North Carolina", data), statslib.getIDFromTeam("Gonzaga", data), statslib.getIDFromTeam("Villanova", data), statslib.getIDFromTeam("Wisconsin", data)]
+test = ts.getMatchups(2017)
+probses = np.zeros((63,2))
+for n in range(63):
+    print str(n)
+    perc, res = ts.genNetworkProbabilities(test[n, 0], test[n, 1], 2017, '../kraggle_model.pkl', True, True)
+    probses[n, :] = np.array([perc, 1.0-perc])
+
+finalScore = ts.getLogScore(probses, test[:, 2])
 #test = ts.getCorrelation(teams[0], 2017, ts.getScaledStats(teams[0], 2017), False, True)
 #test = ts.getScaledStats(teams[0], 2017)
 #build_ttypes(pickle_folder, True)
 #build_pickles(folder, pickle_folder, False)
 #ct, sts, spts, stslist, sptslist = load_pickles(pickle_folder, True)
 #perc, res, scores = ts.genProbabilities(statslib.getIDFromTeam("North Carolina", data), statslib.getIDFromTeam("Kentucky", data), 2017, False, True)
-scsts, sclabels = build_fast_stats(folder, False)
-sccorrs = np.zeros((len(scsts), shape(scsts[0])[1]))
-sz = len(scsts)
-sz_cut = int(sz * 7.0/8)
-training_data = scsts[0]
-labels = sclabels[0]
-for i in range(1, sz):
-    training_data = np.concatenate((training_data, scsts[i]), axis=0)
-    labels = np.concatenate((labels, sclabels[i]))
-    #sccorrs[i, :] = np.corrcoef(scsts[i].T, scpts[i])[-1, 0:-1]
-sz = len(labels)
-sz_cut = int(sz * 7.0/8)
-model = Network([64, 32, 16, 8, 4])
-model.train(training_data[0:sz_cut, :], labels[0:sz_cut])
-test, percs = model.run(training_data[sz_cut:, :], True)
-truths = labels[sz_cut:]
-model.save('/home/artemis-new/Documents/kraggle_model.pkl')
-test = ts.simNetworkScore(teams[0], teams[1], 2017, '../kraggle_model.pkl')
-prob = (sum(test == 2) + sum(test == 3) + 0.0) / len(test)
+#scsts, sclabels = build_fast_stats(folder, True)
+##sccorrs = np.zeros((len(scsts), shape(scsts[0])[1]))
+#training_data = scsts[0][3]
+#labels = sclabels[0][3]
+#for i in range(0, len(scsts)):
+#    for n in range(len(scsts[i])):
+#        if type(scsts[i][n]) != int:
+#            training_data = np.concatenate((training_data, scsts[i][n]), axis=0)
+#            labels = np.concatenate((labels, sclabels[i][n]))
+#sz = shape(training_data)[0]
+#sz_cut = int(sz * 7.0/8)
+#
+#    #sccorrs[i, :] = np.corrcoef(scsts[i].T, scpts[i])[-1, 0:-1]
+#sz = len(labels)
+#sz_cut = int(sz * 7.0/8)
+#model = Network([64, 32, 16, 8, 4])
+#model.train(training_data[0:sz_cut, :], labels[0:sz_cut])
+#test, percs = model.run(training_data[sz_cut:, :], True)
+#truths = labels[sz_cut:]
+#model.save('/home/artemis-new/Documents/kraggle_model.pkl')
+#test = ts.simNetworkScore(teams[0], teams[1], 2017, '../kraggle_model.pkl', True)
+#test, res = ts.genNetworkProbabilities(teams[1], teams[0], 2017, '../kraggle_model.pkl', True, True)
+#tmp = np.sum(test, axis=0)
+#prob = (tmp[2]+tmp[3]) / sum(tmp)
 
