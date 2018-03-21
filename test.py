@@ -15,6 +15,7 @@ import multiprocessing
 import statslib
 from pylab import shape
 import testlib as ts
+import time
 #import scipy as sp
 import numpy as np
 import pickle
@@ -51,34 +52,27 @@ def build_pickles(folder, pickle_folder, tourney=False):
         pickle.dump(sccorrs, open(pickle_folder + "/sccorrs.pkl", "w"))
     return 1
     
-def faststatsloop(i, year, tourney):
+def faststatsloop(i, year):
     print '.',
-    curr_team = TeamStat(folder, i)
-    stats = curr_team.getStatsByYear(year, tourney)
-    if len(stats) > 0:
-        return ts.getTestStats(i, year, tourney)
-    else:
-        return 0
+    team = globals()["lib"].getTeam(i, False, year)
+    stats = ts.getTestStats(team)
+    labels = ts.grabLabels(team)
+    return [stats, labels]
         
-def labelsloop(i, year, tourney):
-    curr_team = TeamStat(folder, i)
-    stats = curr_team.getStatsByYear(year, tourney)
-    if len(stats) > 0:
-        return ts.grabLabels(i, year, tourney)
-    else:
-        return 0
+def labelsloop(i, lib):
+    return ts.grabLabels(lib.getTeam(i, False))
     
-def build_fast_stats(folder, tourney=False):
+def build_fast_stats():
     scsts = []
     sclabels = []
     #scpts = []
-    teams = np.arange(1101, 1464)
     for year in range(2003, 2018):
         print str(year),
-        tmpsts = Parallel(n_jobs=multiprocessing.cpu_count())(delayed(faststatsloop)(g, year, tourney) for g in teams)
+        teams = np.arange(1101, 1464)
+        tmpsts = Parallel(n_jobs=multiprocessing.cpu_count())(delayed(faststatsloop)(g, year) for g in teams)
         scsts.append(tmpsts)
-        tmplabels = Parallel(n_jobs=multiprocessing.cpu_count())(delayed(labelsloop)(g, year, tourney) for g in teams)
-        sclabels.append(tmplabels)
+        #tmplabels = Parallel(n_jobs=multiprocessing.cpu_count())(delayed(labelsloop)(g, lib) for g in teams)
+        #sclabels.append(tmpsts[1])
 #        for i in teams:
 #            print '.',
 #            curr_team = TeamStat(folder, i)
@@ -91,7 +85,7 @@ def build_fast_stats(folder, tourney=False):
 #                #scpts.append(dstats[:, 10])
 #                #sccorrs.append(overcorr)
             
-    return scsts, sclabels
+    return scsts
 
 def load_pickles(folder, tourney):
     if tourney:
@@ -166,18 +160,24 @@ def build_ttypes(pickle_folder, tourney=False):
         test = pickle.load(open(pickle_folder + "/ttypes.pkl"))
     return test
     
+def quickStat(i, year):
+    print '.',
+    curr_team = globals()["lib"].getTeam(i, False, year)
+    globals()["scsts"].append(ts.getTestStats(curr_team))
+    globals()["sclabels"].append(ts.grabLabels(curr_team))
     
 folder = '../kraggle_data'
 pickle_folder = '.'
-data = statslib.loadDataDict(folder)
-#teams = np.arange(1101, 1464)
+#data = statslib.loadDataDict(folder)
+lib = statslib.DataLib(folder)
+teams = np.arange(1101, 1464)
 ##test = ts.getCorrelation(1140, 2017, ts.getScaledStats(1140, 2017), False, True)
 #teams = [statslib.getIDFromTeam("North Carolina", data), statslib.getIDFromTeam("Gonzaga", data), statslib.getIDFromTeam("Villanova", data), statslib.getIDFromTeam("Wisconsin", data)]
 test = ts.getMatchups(2017)
 probses = np.zeros((63,2))
 for n in range(63):
     print str(n)
-    perc, res = ts.genNetworkProbabilities(test[n, 0], test[n, 1], 2017, '../kraggle_model.pkl', True, True)
+    perc, res = ts.genNetworkProbabilities(lib.getTeam(test[n, 0], False, 2017), lib.getTeam(test[n, 1], False, 2017), '../kraggle_model.pkl', True)
     probses[n, :] = np.array([perc, 1.0-perc])
 
 finalScore = ts.getLogScore(probses, test[:, 2])
@@ -187,15 +187,24 @@ finalScore = ts.getLogScore(probses, test[:, 2])
 #build_pickles(folder, pickle_folder, False)
 #ct, sts, spts, stslist, sptslist = load_pickles(pickle_folder, True)
 #perc, res, scores = ts.genProbabilities(statslib.getIDFromTeam("North Carolina", data), statslib.getIDFromTeam("Kentucky", data), 2017, False, True)
-#scsts, sclabels = build_fast_stats(folder, True)
-##sccorrs = np.zeros((len(scsts), shape(scsts[0])[1]))
-#training_data = scsts[0][3]
-#labels = sclabels[0][3]
+#scsts = build_fast_stats()
+##scsts = []
+##sclabels = []
+##pool = multiprocessing.Pool(multiprocessing.cpu_count()-1)
+##for year in range(2003, 2018):
+##    print str(year),
+##    for i in teams:
+##        pool.apply_async(quickStat, (i, year))
+##pool.close()
+##pool.join()
+###sccorrs = np.zeros((len(scsts), shape(scsts[0])[1]))
+#training_data = scsts[0][1][0]
+#labels = scsts[0][1][1]
 #for i in range(0, len(scsts)):
 #    for n in range(len(scsts[i])):
-#        if type(scsts[i][n]) != int:
-#            training_data = np.concatenate((training_data, scsts[i][n]), axis=0)
-#            labels = np.concatenate((labels, sclabels[i][n]))
+#        if type(scsts[i][n][0]) != int:
+#            training_data = np.concatenate((training_data, scsts[i][n][0]), axis=0)
+#            labels = np.concatenate((labels, scsts[i][n][1]))
 #sz = shape(training_data)[0]
 #sz_cut = int(sz * 7.0/8)
 #
@@ -208,7 +217,15 @@ finalScore = ts.getLogScore(probses, test[:, 2])
 #truths = labels[sz_cut:]
 #model.save('/home/artemis-new/Documents/kraggle_model.pkl')
 #test = ts.simNetworkScore(teams[0], teams[1], 2017, '../kraggle_model.pkl', True)
-#test, res = ts.genNetworkProbabilities(teams[1], teams[0], 2017, '../kraggle_model.pkl', True, True)
+
+        
+test, res = ts.genNetworkProbabilities(lib.getTeam(1211, False, 2017), lib.getTeam(1140, False, 2017), '../kraggle_model.pkl', True)
 #tmp = np.sum(test, axis=0)
 #prob = (tmp[2]+tmp[3]) / sum(tmp)
+#
+#print time.time()
+#for i in teams:
+#    test = lib.getTeam(i, False, 2017)
+#    teststats = ts.getTestStats(test, False)
+#    print time.time()
 
