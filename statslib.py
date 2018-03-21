@@ -40,6 +40,47 @@ def loadDataDict(folder):
             data['rankings'] = f
     return data
     
+class DataLib(object):
+    
+    def __init__(self, folder):
+        self.folder = folder
+        fname = folder + "/*.csv"
+        filenames = glob.glob(fname)
+        data = {}
+        
+        for f in filenames:
+            if "Teams" in f:
+                data['teams'] = f
+            elif "TeamCoaches" in f:
+                data['coach'] = f
+            elif "TeamConferences" in f:
+                data['conf'] = f
+            elif "SecondaryTourneyCompact" in f:
+                data['nit'] = f
+            elif "RegularSeasonDetailed" in f:
+                data['season'] = f
+            elif "NCAATourneySlots" in f:
+                data['tourney_slots'] = f
+            elif "NCAATourneySeeds" in f:
+                data['tourney_seeds'] = f
+            elif "NCAATourneyDetailed" in f:
+                data['tourney'] = f
+            elif "Conferences" in f:
+                data['conf_names'] = f
+            elif "Massey" in f:
+                data['rankings'] = f
+                
+        self.data = data
+        
+    def loadRankings(self):
+        ranks = []
+        with open(self.data['rankings'], 'rb') as csvfile:
+            rd = csv.reader(csvfile, delimiter=',')
+            for row in rd:
+                ranks.append(row)
+        self.ranks = ranks
+        
+        
 def loadPlayData(folder, year):
     if int(year) < 2010:
         print 'Year before 2010'
