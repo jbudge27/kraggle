@@ -101,6 +101,7 @@ def getDefStats(t1, year, tourney=False, verbose=False):
     stats = np.array(stats)
     return stats, hg
     
+    
 """
 Your scaled stats glossary:
 | 0 Opp TS% | 1 Team TS% | 2 DR Diff. | 3 Ast Diff. | 4 Opp FT% | 5 TS% Impact

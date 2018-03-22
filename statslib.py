@@ -152,6 +152,7 @@ class DataLib(object):
         team = {}
         team['id'] = team_id
         games, wins, gp = self.getTeamGames(team_id, tourney, year)
+        team['gp'] = gp
         #Snag the stats for this team
         stats = np.zeros((34, gp))
         for i in range(gp):
@@ -233,6 +234,7 @@ class DataLib(object):
                 rks[rks[:, 1] == 0.0, 1] = firstrank[0]
         team['ranks'] = rks
         team['tourney'] = tourney
+        
         return team
         
         
