@@ -70,8 +70,8 @@ def faststatsloop(i, year):
         for oi in range(len(labels)):
             oppteam = globals()["lib"].getTeam(int(team["stats"][oi, 33]), False, year)
             findgame = np.logical_and(oppteam["stats"][:, 33] == team["id"], oppteam["stats"][:, 2] == team["stats"][oi, 2])
-            defstats[oi, 1] = oppteam["dstats"][:, 18].mean() - oppteam["dstats"][findgame, 18]
-            defstats[oi, 2] = oppteam["ranks"][findgame, 1] - team["ranks"][oi, 1]
+            defstats[oi, 0] = oppteam["dstats"][:, 18].mean() - oppteam["dstats"][findgame, 18]
+            defstats[oi, 1] = oppteam["ranks"][findgame, 1] - team["ranks"][oi, 1]
         stats = np.concatenate((stats, defstats), axis=1)
     return [stats, labels]
     
@@ -179,7 +179,7 @@ lib = statslib.DataLib(folder)
 #build_pickles(folder, pickle_folder, False)
 #ct, sts, spts, stslist, sptslist = load_pickles(pickle_folder, True)
 #perc, res, scores = ts.genProbabilities(statslib.getIDFromTeam("North Carolina", data), statslib.getIDFromTeam("Kentucky", data), 2017, False, True)
-scsts = build_fast_stats()
+scsts = build_fast_stats(2015)
 ##scsts = []
 ##sclabels = []
 ##pool = multiprocessing.Pool(multiprocessing.cpu_count()-1)
@@ -190,24 +190,24 @@ scsts = build_fast_stats()
 ##pool.close()
 ##pool.join()
 ###sccorrs = np.zeros((len(scsts), shape(scsts[0])[1]))
-#training_data = scsts[0][1][0]
-#labels = scsts[0][1][1]
-#for i in range(0, len(scsts)):
-#    for n in range(len(scsts[i])):
-#        if type(scsts[i][n][0]) != int:
-#            training_data = np.concatenate((training_data, scsts[i][n][0]), axis=0)
-#            labels = np.concatenate((labels, scsts[i][n][1]))
-#sz = shape(training_data)[0]
-#sz_cut = int(sz * 7.0/8)
-#
-#    #sccorrs[i, :] = np.corrcoef(scsts[i].T, scpts[i])[-1, 0:-1]
-#sz = len(labels)
-#sz_cut = int(sz * 7.0/8)
-#model = Network([64, 32, 16, 8, 4])
-#model.train(training_data[0:sz_cut, :], labels[0:sz_cut])
-#test, percs = model.run(training_data[sz_cut:, :], True)
-#truths = labels[sz_cut:]
-#model.save('/home/artemis-new/Documents/kraggle_model.pkl')
+training_data = scsts[0][1][0]
+labels = scsts[0][1][1]
+for i in range(0, len(scsts)):
+    for n in range(len(scsts[i])):
+        if type(scsts[i][n][0]) != int:
+            training_data = np.concatenate((training_data, scsts[i][n][0]), axis=0)
+            labels = np.concatenate((labels, scsts[i][n][1]))
+sz = shape(training_data)[0]
+sz_cut = int(sz * 7.0/8)
+
+    #sccorrs[i, :] = np.corrcoef(scsts[i].T, scpts[i])[-1, 0:-1]
+sz = len(labels)
+sz_cut = int(sz * 7.0/8)
+model = Network([64, 32, 16, 8, 4])
+model.train(training_data[0:sz_cut, :], labels[0:sz_cut])
+test, percs = model.run(training_data[sz_cut:, :], True)
+truths = labels[sz_cut:]
+model.save('/home/artemis-new/Documents/kraggle_model.pkl')
 #test = ts.simNetworkScore(teams[0], teams[1], 2017, '../kraggle_model.pkl', True)
 
         
