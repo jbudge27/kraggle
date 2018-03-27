@@ -15,6 +15,7 @@ import multiprocessing
 import numpy as np
 import scipy as sp
 import statslib as slib
+from statslib import DataLib
 from pylab import shape
 import csv
 import pickle
@@ -126,7 +127,7 @@ And the test_stats glossary...
 |0 Team FG% | 1 Team 3FG% | 2 Team FT% | 3 Team RB% | 4 Team Ast% | 5 Opp FG% | 6 Opp 3FG%
 | 7 Opp FT% | 8 Opp RB% | 9 Opp Ast% | 10 Team TS% | 11 Opp TS% | 12 Team FTR | 13 Opp FTR 
 | 14 Team Poss | 15 Opp Poss | 16:22 Team stats (7 cols) | 23:29 Opp. stats (7 cols) | 30 Team Rank
-| 31 Home/Away for team
+| 31 Home/Away for team | 32 Team TS% Impact | 33 Rank Diff
 
 Stat structure:
 | 16 23 | 17 24 | 18 25 | 19 26 | 20 27 | 21 28 | 22 29
@@ -147,33 +148,41 @@ Stat structure:
 #    else:
 #        return 0
         
-def getTestStats(team, verbose=False):
+def getTestStats(team, lib, verbose=False):
     dstats = team['dstats']
     stats = team['stats']
     if verbose:
         print str(team['id']) + ' ',
+    defstats = np.zeros((team["gp"], 2))
+        
     if len(stats) > 0:
+        for oi in range(team["gp"]):
+            oppteam = lib.getTeam(int(team["stats"][oi, 33]), False, team['year'])
+            findgame = np.logical_and(oppteam["stats"][:, 33] == team["id"], oppteam["stats"][:, 2] == team["stats"][oi, 2])
+            defstats[oi, 0] = oppteam["dstats"][:, 18].mean() - oppteam["dstats"][findgame, 18]
+            defstats[oi, 1] = oppteam["ranks"][findgame, 1] - team["ranks"][oi, 1]
         ranks = team['ranks'][:, 1]
         if team['tourney']:
             final_rank = np.average(ranks, weights=np.exp(np.arange(len(ranks))))
             ranks = np.ones((shape(stats)[0],1))*final_rank
             #print ranks
-        return np.concatenate((dstats[:, 0:10], dstats[:, 18:24], stats[:, 13:20], stats[:, 26:33], np.reshape(ranks, (len(ranks), 1)), np.reshape(stats[:, 5], (len(ranks), 1))), axis=1)
+        return np.concatenate((dstats[:, 0:10], dstats[:, 18:24], stats[:, 13:20], stats[:, 26:33], np.reshape(ranks, (len(ranks), 1)), np.reshape(stats[:, 5], (len(ranks), 1)), defstats), axis=1)
     else:
         return 0
         
-def simNetworkScore(t1, t2, model, verbose=False):
+def simNetworkScore(t1, t2, model, lib, verbose=False):
     results = np.zeros((10000,4))
-    hstats = getTestStats(t1, verbose)
-    astats = getTestStats(t2, verbose)
+    hstats = getTestStats(t1, lib, verbose)
+    astats = getTestStats(t2, lib, verbose)
     htstats = hstats
     atstats = astats
     home = np.mean(htstats, axis=0)
     away = np.mean(atstats, axis=0)
     hstd = np.std(hstats, axis=0)
     astd = np.std(astats, axis=0)
-    avs = np.concatenate((home[0:5], away[5:10], np.array([home[10], away[11], home[12], away[13], home[14], away[15]]), home[16:23], away[23:], np.array([0])), axis=0)
-    stds = np.concatenate((hstd[0:5], astd[5:10], np.array([hstd[10], astd[11], hstd[12], astd[13], hstd[14], astd[15]]), hstd[16:23], astd[23:], np.array([0])))
+    rkdif = home[30] - away[30]
+    avs = np.concatenate((home[0:5], away[5:10], np.array([home[10], away[11], home[12], away[13], home[14], away[15]]), home[16:23], away[23:30], np.array([home[30], 0, home[32], rkdif])), axis=0)
+    stds = np.concatenate((hstd[0:5], astd[5:10], np.array([hstd[10], astd[11], hstd[12], astd[13], hstd[14], astd[15]]), hstd[16:23], astd[23:30], np.array([0, 0, hstd[32], 0])))
     nn = Network([10])
     nn.load(model)
     for i in range(10000):
@@ -183,8 +192,8 @@ def simNetworkScore(t1, t2, model, verbose=False):
         toss, results[i, :] = nn.run(sts, True)
     return results
     
-def genNetworkProbabilities(t1, t2, model, verbose=False):
-    res = simNetworkScore(t1, t2, model, verbose)
+def genNetworkProbabilities(t1, t2, model, lib, verbose=False):
+    res = simNetworkScore(t1, t2, model, lib, verbose)
     #res2 = simNetworkScore(t2, t1, year, model, tourney, verbose)
     tmp = np.sum(res, axis=0)
     prob = (tmp[2] + tmp[3]) / sum(tmp)

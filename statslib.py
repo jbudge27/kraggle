@@ -151,6 +151,7 @@ class DataLib(object):
     def getTeam(self, team_id, tourney=False, year=None):
         team = {}
         team['id'] = team_id
+        team['year'] = year
         games, wins, gp = self.getTeamGames(team_id, tourney, year)
         team['gp'] = gp
         #Snag the stats for this team
