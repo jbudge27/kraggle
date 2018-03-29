@@ -167,11 +167,11 @@ def getTestStats(team, lib, verbose=False):
             ranks = np.ones((shape(stats)[0],1))*final_rank
             #print ranks
         return np.concatenate((dstats[:, 0:10], dstats[:, 18:24], stats[:, 13:20], stats[:, 26:33], np.reshape(ranks, (len(ranks), 1)), np.reshape(stats[:, 5], (len(ranks), 1)), defstats), axis=1)
+        #return np.concatenate((dstats[:, 0:10], dstats[:, 18:24], stats[:, 13:20], stats[:, 26:33], np.reshape(ranks, (len(ranks), 1)), np.reshape(stats[:, 5], (len(ranks), 1))), axis=1)
     else:
         return 0
         
-def simNetworkScore(t1, t2, model, lib, verbose=False):
-    results = np.zeros((10000,4))
+def loadGameModel(t1, t2, lib, verbose=False):
     hstats = getTestStats(t1, lib, verbose)
     astats = getTestStats(t2, lib, verbose)
     htstats = hstats
@@ -180,12 +180,31 @@ def simNetworkScore(t1, t2, model, lib, verbose=False):
     away = np.mean(atstats, axis=0)
     hstd = np.std(hstats, axis=0)
     astd = np.std(astats, axis=0)
-    rkdif = home[30] - away[30]
-    avs = np.concatenate((home[0:5], away[5:10], np.array([home[10], away[11], home[12], away[13], home[14], away[15]]), home[16:23], away[23:30], np.array([home[30], 0, home[32], rkdif])), axis=0)
-    stds = np.concatenate((hstd[0:5], astd[5:10], np.array([hstd[10], astd[11], hstd[12], astd[13], hstd[14], astd[15]]), hstd[16:23], astd[23:30], np.array([0, 0, hstd[32], 0])))
+    rkdif = away[30] - home[30]
+    avs = np.concatenate((home[0:5], away[0:5], np.array([home[10] - away[32], away[10] - home[32], home[12], away[12], home[14], away[14]]), home[16:23], away[16:23], np.array([home[30], 0, home[32], rkdif])), axis=0)
+    stds = np.concatenate((hstd[0:5], astd[0:5], np.array([hstd[10], astd[10], hstd[12], astd[12], hstd[14], astd[14]]), hstd[16:23], astd[16:23], np.array([0, 0, hstd[32], 0])))
+    return avs, stds
+        
+#def loadGameModel(t1, t2, lib, verbose=False):
+#    hstats = getTestStats(t1, lib, verbose)
+#    astats = getTestStats(t2, lib, verbose)
+#    htstats = hstats
+#    atstats = astats
+#    home = np.mean(htstats, axis=0)
+#    away = np.mean(atstats, axis=0)
+#    hstd = np.std(hstats, axis=0)
+#    astd = np.std(astats, axis=0)
+#    #rkdif = away[30] - home[30]
+#    avs = np.concatenate((home[0:5], away[0:5], np.array([home[10], away[10], home[12], away[12], home[14], away[14]]), home[16:23], away[16:23], np.array([home[30], 0])), axis=0)
+#    stds = np.concatenate((hstd[0:5], astd[0:5], np.array([hstd[10], astd[10], hstd[12], astd[12], hstd[14], astd[14]]), hstd[16:23], astd[16:23], np.array([0, 0])))
+#    return avs, stds
+        
+def simNetworkScore(t1, t2, model, lib, verbose=False):
+    results = np.zeros((1000,4))
+    avs, stds = loadGameModel(t1, t2, lib, verbose)
     nn = Network([10])
     nn.load(model)
-    for i in range(10000):
+    for i in range(1000):
         sts = np.zeros((len(avs),))
         for n in range(len(sts)):
             sts[n] = np.random.normal(loc=avs[n], scale=stds[n])
@@ -194,8 +213,8 @@ def simNetworkScore(t1, t2, model, lib, verbose=False):
     
 def genNetworkProbabilities(t1, t2, model, lib, verbose=False):
     res = simNetworkScore(t1, t2, model, lib, verbose)
-    #res2 = simNetworkScore(t2, t1, year, model, tourney, verbose)
-    tmp = np.sum(res, axis=0)
+    #res2 = simNetworkScore(t2, t1, model, lib, verbose)
+    tmp = np.sum(res, axis=0)# + np.flip(np.sum(res2, axis=0), 0)
     prob = (tmp[2] + tmp[3]) / sum(tmp)
     #prob = (sum(res == 2) + sum(res == 3) + 0.0) / len(res)
     if prob <= 0:
@@ -205,49 +224,22 @@ def genNetworkProbabilities(t1, t2, model, lib, verbose=False):
     return prob, res
     
                
-def simulateScore(hStats, aStats, pt_diff, rkg, iters = 100, verbose = False):
+def simulateScore(t1, t2, lib, coeffs, verbose = False):
+    iters = 100
     results = np.zeros((iters,))
-    corrs = getTeamType(hStats, pt_diff, verbose)
-    gameStats = hStats
-    gameStats[1, :] = hStats[1, :] + unscale(aStats[5, :].mean(), .5, -.5)
-    avs = np.mean(hStats, axis=1)
-    avs[0] = aStats[0, :].mean()
-    avs[4] = aStats[4, :].mean()
-    sigma = np.std(hStats, axis=1)
-    sigma[0] = aStats[0, :].std()
-    sigma[4] = aStats[4, :].std()
-    avs[6] = scale(rkg, 333, -333)
-    sigma[6] = 0
+    avs, stds = loadGameModel(t1, t2, lib, verbose)
     for i in range(iters):
-        sts = np.zeros((len(corrs),))
-        for n in range(len(corrs)):
-            sts[n] = np.random.normal(loc=avs[n], scale=sigma[n])
-        results[i] = sum(sts*corrs)
+        sts = np.zeros((len(avs),))
+        for n in range(len(avs)):
+            sts[n] = np.random.normal(loc=avs[n], scale=stds[n])
+        results[i] = sum(sts*coeffs)
     return results
     
-def genProbabilities(t1, t2, year, tourney=False, verbose=False):
-    #grab data folder and csv filenames
-    folder = '../kraggle_data'
-    iters = 1000
-    home = TeamStat(folder, t1)
-    away = TeamStat(folder, t2)
-    hStats = getScaledStats(t1, year, tourney, verbose)
-    aStats = getScaledStats(t2, year, tourney, verbose)
-    hRank = home.getAverageRank(year)[:, 1]
-    aRank = away.getAverageRank(year)[:, 1]
-    rkg = np.average(hRank, weights=np.exp(np.arange(shape(hRank)[0]))) \
-        - np.average(aRank, weights=np.exp(np.arange(shape(aRank)[0])))
-    if verbose:
-        print "Simulating {} games...".format(iters)
-        print "Team {}".format(t1)
-    homeScore = simulateScore(hStats, aStats, home.getDerivedStatsByYear(year, tourney)[:,10], rkg, iters, verbose)
-    if verbose:
-        print "Team {}".format(t2)
-    awayScore = simulateScore(aStats, hStats, away.getDerivedStatsByYear(year, tourney)[:,10], -rkg, iters, verbose)
+def genProbabilities(t1, t2, lib, coeffs, verbose=False):
     
-    hperc = sum(homeScore - awayScore > 0) / (iters + 0.0)
-    
-    return [hperc, 1.0 - hperc], [hStats, aStats], [homeScore, awayScore]
+    res = simulateScore(t1, t2, lib, coeffs, verbose)
+    hperc = sum(res > 0) / 100.0
+    return hperc, res
     
 """
 Matchups array key as follows:
@@ -322,14 +314,17 @@ def getMatchups(year):
 #    ret[home > 15] = 3
 #    return ret
     
-def grabLabels(t1):
+def grabLabels(t1, get_pts=False):
     home = t1['dstats'][:, 10]
     ret = home + 0.0
     ret[home < 0] = 1
     ret[home > 0] = 2
     ret[home < -15] = 0
     ret[home > 15] = 3
-    return ret
+    if get_pts:
+        return ret, home
+    else:
+        return ret
         
 def getLogScore(predictions, labels):
     n = len(labels)

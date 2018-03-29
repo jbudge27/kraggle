@@ -62,17 +62,17 @@ of all the teams this particular team played that year.
 def faststatsloop(i, year):
     print '.',
     team = globals()["lib"].getTeam(i, False, year)
-    stats = ts.getTestStats(team)
-    labels = ts.grabLabels(team)
-    defstats = np.zeros((team["gp"], 2))
-    #print team["gp"]
-    if len(labels) > 0:
-        for oi in range(len(labels)):
-            oppteam = globals()["lib"].getTeam(int(team["stats"][oi, 33]), False, year)
-            findgame = np.logical_and(oppteam["stats"][:, 33] == team["id"], oppteam["stats"][:, 2] == team["stats"][oi, 2])
-            defstats[oi, 0] = oppteam["dstats"][:, 18].mean() - oppteam["dstats"][findgame, 18]
-            defstats[oi, 1] = oppteam["ranks"][findgame, 1] - team["ranks"][oi, 1]
-        stats = np.concatenate((stats, defstats), axis=1)
+    stats = ts.getTestStats(team, globals()["lib"])
+    etc, labels = ts.grabLabels(team, True)
+#    defstats = np.zeros((team["gp"], 2))
+#    #print team["gp"]
+#    if len(labels) > 0:
+#        for oi in range(len(labels)):
+#            oppteam = globals()["lib"].getTeam(int(team["stats"][oi, 33]), False, year)
+#            findgame = np.logical_and(oppteam["stats"][:, 33] == team["id"], oppteam["stats"][:, 2] == team["stats"][oi, 2])
+#            defstats[oi, 0] = oppteam["dstats"][:, 18].mean() - oppteam["dstats"][findgame, 18]
+#            defstats[oi, 1] = oppteam["ranks"][findgame, 1] - team["ranks"][oi, 1]
+#        stats = np.concatenate((stats, defstats), axis=1)
     return [stats, labels]
     
 def build_fast_stats(start_year=2003):
@@ -160,64 +160,85 @@ def build_ttypes(pickle_folder, tourney=False):
     
 folder = '../kraggle_data'
 pickle_folder = '.'
-#data = statslib.loadDataDict(folder)
+data = statslib.loadDataDict(folder)
 lib = statslib.DataLib(folder)
-#teams = np.arange(1101, 1464)
-###test = ts.getCorrelation(1140, 2017, ts.getScaledStats(1140, 2017), False, True)
-##teams = [statslib.getIDFromTeam("North Carolina", data), statslib.getIDFromTeam("Gonzaga", data), statslib.getIDFromTeam("Villanova", data), statslib.getIDFromTeam("Wisconsin", data)]
-test = ts.getMatchups(2017)
+year = 2017
+
+#-----------RUN TOURNEY--------------------------------------------------------
+test = ts.getMatchups(year)
 probses = np.zeros((63,2))
 for n in range(63):
     print str(n)
-    perc, res = ts.genNetworkProbabilities(lib.getTeam(test[n, 0], False, 2017), lib.getTeam(test[n, 1], False, 2017), '../kraggle_model.pkl', lib, True)
+    perc, res = ts.genNetworkProbabilities(lib.getTeam(test[n, 0], False, year), lib.getTeam(test[n, 1], False, year), '../kraggle_model.pkl', lib, True)
+    #perc, res = ts.genProbabilities(lib.getTeam(test[n, 0], False, year), lib.getTeam(test[n, 1], False, year), lib, coeffs, True)
     probses[n, :] = np.array([perc, 1.0-perc])
 
 finalScore = ts.getLogScore(probses, test[:, 2])
+corrects = sum(np.logical_and(probses[:, 0] > probses[:, 1], test[:, 2])) / 63.0
+chalk = sum(test[:, 2]) / 63.0
+#------------------------------------------------------------------------------
 #test = ts.getCorrelation(teams[0], 2017, ts.getScaledStats(teams[0], 2017), False, True)
 #test = ts.getScaledStats(teams[0], 2017)
 #build_ttypes(pickle_folder, True)
 #build_pickles(folder, pickle_folder, False)
 #ct, sts, spts, stslist, sptslist = load_pickles(pickle_folder, True)
 #perc, res, scores = ts.genProbabilities(statslib.getIDFromTeam("North Carolina", data), statslib.getIDFromTeam("Kentucky", data), 2017, False, True)
-#scsts = build_fast_stats(2015)
-##scsts = []
-##sclabels = []
-##pool = multiprocessing.Pool(multiprocessing.cpu_count()-1)
-##for year in range(2003, 2018):
-##    print str(year),
-##    for i in teams:
-##        pool.apply_async(quickStat, (i, year))
-##pool.close()
-##pool.join()
-###sccorrs = np.zeros((len(scsts), shape(scsts[0])[1]))
+##BUILD MODEL------------------------------------------------------------------
+#scsts = build_fast_stats(2010)
+#sccorrs = []
 #training_data = scsts[0][1][0]
 #labels = scsts[0][1][1]
+#sz = len(labels)
 #for i in range(0, len(scsts)):
 #    for n in range(len(scsts[i])):
 #        if type(scsts[i][n][0]) != int:
 #            training_data = np.concatenate((training_data, scsts[i][n][0]), axis=0)
 #            labels = np.concatenate((labels, scsts[i][n][1]))
+#            sccorrs.append(np.corrcoef(scsts[i][n][0].T, np.reshape(scsts[i][n][1], (1, len(scsts[i][n][1]))))[32, 0:-1])
 #sz = shape(training_data)[0]
 #sz_cut = int(sz * 7.0/8)
-#
-#    #sccorrs[i, :] = np.corrcoef(scsts[i].T, scpts[i])[-1, 0:-1]
 #sz = len(labels)
 #sz_cut = int(sz * 7.0/8)
+#sccorrs = np.array(sccorrs)
 #model = Network([64, 32, 16, 8, 4])
 #model.train(training_data[0:sz_cut, :], labels[0:sz_cut])
 #test, percs = model.run(training_data[sz_cut:, :], True)
 #truths = labels[sz_cut:]
-#model.save('/home/artemis-new/Documents/kraggle_model.pkl')
+#model.save('/home/artemis-new/Documents/kraggle_model_sans_def.pkl')
+##-----------------------------------------------------------------------------
 #test = ts.simNetworkScore(teams[0], teams[1], 2017, '../kraggle_model.pkl', True)
 
         
-#test, res = ts.genNetworkProbabilities(lib.getTeam(1211, False, 2017), lib.getTeam(1140, False, 2017), '../kraggle_model.pkl', lib, True)
-#tmp = np.sum(test, axis=0)
-#prob = (tmp[2]+tmp[3]) / sum(tmp)
-#
-#print time.time()
-#for i in teams:
-#    test = lib.getTeam(i, False, 2017)
-#    teststats = ts.getTestStats(test, False)
-#    print time.time()
+#test, res = ts.genNetworkProbabilities(lib.getTeam(statslib.getIDFromTeam("North Carolina", data), False, year), lib.getTeam(1211, False, year), '../kraggle_model_sans_def.pkl', lib, True)
+#test, res = ts.genProbabilities(lib.getTeam(statslib.getIDFromTeam("North Carolina", data), False, year), lib.getTeam(1211, False, year), lib, rep_teams, ttype_coeffs, True)
+
+#af = cluster.AffinityPropagation(preference=-50).fit(sccorrs)
+
+#team_types = [[], [], [], [], [], [], []]
+#label_types = [[], [], [], [], [], [], []]
+#for i in range(0, len(scsts)):
+#    for n in range(len(scsts[i])):
+#        if type(scsts[i][n][0]) != int:
+#            training_data = scsts[i][n][0]
+#            labels = scsts[i][n][1]
+#            corr = np.corrcoef(scsts[i][n][0].T, np.reshape(scsts[i][n][1], (1, len(scsts[i][n][1]))))[32, 0:-1]
+#            dists = np.zeros((7,))
+#            for m in range(7):
+#                dists[m] = np.linalg.norm(corr - rep_teams[m])
+#            ttype = np.where(dists == dists.min())[0][0]
+#            team_types[ttype].append(training_data)
+#            label_types[ttype].append(labels)
+#            
+#ttype_coeffs = np.zeros((7, 32))
+#for i in range(7):
+#    curr_ttype = []
+#    curr_label = []
+#    for n in range(len(team_types[i])):
+#        if len(curr_ttype) == 0:
+#            curr_ttype = team_types[i][n]
+#            curr_label = label_types[i][n]
+#        else:
+#            curr_ttype = np.concatenate((curr_ttype, team_types[i][n]))
+#            curr_label = np.concatenate((curr_label, label_types[i][n]))
+#    ttype_coeffs[i, :] = np.linalg.lstsq(curr_ttype, curr_label)[0]
 
